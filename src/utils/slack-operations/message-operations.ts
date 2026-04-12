@@ -4,6 +4,7 @@ import type {
   ChatScheduleMessageResponse,
   ChatUpdateResponse,
 } from '@slack/web-api';
+import type { Block, KnownBlock } from '@slack/types';
 import type {
   ChannelUnreadResult,
   HistoryOptions,
@@ -42,35 +43,43 @@ export class MessageOperations extends BaseSlackClient {
   async sendMessage(
     channel: string,
     text: string,
-    thread_ts?: string
+    thread_ts?: string,
+    blocks?: (KnownBlock | Block)[]
   ): Promise<ChatPostMessageResponse> {
-    return await this.writeOps.sendMessage(channel, text, thread_ts);
+    return await this.writeOps.sendMessage(channel, text, thread_ts, blocks);
   }
 
   async sendEphemeralMessage(
     channel: string,
     user: string,
     text: string,
-    thread_ts?: string
+    thread_ts?: string,
+    blocks?: (KnownBlock | Block)[]
   ): Promise<ChatPostEphemeralResponse> {
-    return await this.writeOps.sendEphemeralMessage(channel, user, text, thread_ts);
+    return await this.writeOps.sendEphemeralMessage(channel, user, text, thread_ts, blocks);
   }
 
   async scheduleMessage(
     channel: string,
     text: string,
     post_at: number,
-    thread_ts?: string
+    thread_ts?: string,
+    blocks?: (KnownBlock | Block)[]
   ): Promise<ChatScheduleMessageResponse> {
-    return await this.writeOps.scheduleMessage(channel, text, post_at, thread_ts);
+    return await this.writeOps.scheduleMessage(channel, text, post_at, thread_ts, blocks);
   }
 
   async listScheduledMessages(channel?: string, limit = 50): Promise<ScheduledMessage[]> {
     return await this.writeOps.listScheduledMessages(channel, limit);
   }
 
-  async updateMessage(channel: string, ts: string, text: string): Promise<ChatUpdateResponse> {
-    return await this.writeOps.updateMessage(channel, ts, text);
+  async updateMessage(
+    channel: string,
+    ts: string,
+    text: string,
+    blocks?: (KnownBlock | Block)[]
+  ): Promise<ChatUpdateResponse> {
+    return await this.writeOps.updateMessage(channel, ts, text, blocks);
   }
 
   async deleteMessage(channel: string, ts: string): Promise<void> {
