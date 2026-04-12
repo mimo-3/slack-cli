@@ -194,14 +194,35 @@ export const optionValidators = {
   },
 
   /**
-   * Validates message/file options for send command
+   * Validates message/file options for send command (blocks can be used with or without message)
    */
   messageOrFile: (options: Record<string, unknown>): string | null => {
-    if (!options.message && !options.file) {
+    const hasBlocks = !!options.blocks || !!options.blocksFile;
+    if (!options.message && !options.file && !hasBlocks) {
       return ERROR_MESSAGES.NO_MESSAGE_OR_FILE;
     }
     if (options.message && options.file) {
       return ERROR_MESSAGES.BOTH_MESSAGE_AND_FILE;
+    }
+    return null;
+  },
+
+  /**
+   * Validates blocks/blocksFile options for send command
+   */
+  blocksOption: (options: Record<string, unknown>): string | null => {
+    if (options.blocks && options.blocksFile) {
+      return ERROR_MESSAGES.BOTH_BLOCKS_AND_BLOCKS_FILE;
+    }
+    if (options.blocks) {
+      try {
+        const parsed = JSON.parse(options.blocks as string);
+        if (!Array.isArray(parsed)) {
+          return ERROR_MESSAGES.INVALID_BLOCKS_JSON;
+        }
+      } catch {
+        return ERROR_MESSAGES.INVALID_BLOCKS_JSON;
+      }
     }
     return null;
   },
