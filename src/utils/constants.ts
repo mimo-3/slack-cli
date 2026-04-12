@@ -13,6 +13,10 @@ export const ERROR_MESSAGES = {
   // Validation errors
   NO_MESSAGE_OR_FILE: 'You must specify either --message or --file',
   BOTH_MESSAGE_AND_FILE: 'Cannot use both --message and --file',
+  INVALID_BLOCKS_JSON: 'Invalid blocks JSON: must be a valid JSON array',
+  BLOCKS_FILE_READ_ERROR: (file: string, error: string) =>
+    `Error reading blocks file ${file}: ${error}`,
+  BOTH_BLOCKS_AND_BLOCKS_FILE: 'Cannot use both --blocks and --blocks-file',
   INVALID_THREAD_TIMESTAMP: 'Invalid thread timestamp format',
   INVALID_SCHEDULE_AT:
     'Invalid schedule time format. Use Unix timestamp (seconds) or ISO 8601 date-time',
