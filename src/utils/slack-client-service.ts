@@ -4,6 +4,7 @@ import {
   ChatScheduleMessageResponse,
   ChatUpdateResponse,
 } from '@slack/web-api';
+import type { Block, KnownBlock } from '@slack/types';
 import type {
   CanvasFile,
   CanvasSection,
@@ -66,31 +67,39 @@ export class SlackApiClient {
   async sendMessage(
     channel: string,
     text: string,
-    thread_ts?: string
+    thread_ts?: string,
+    blocks?: (KnownBlock | Block)[]
   ): Promise<ChatPostMessageResponse> {
-    return this.messageOps.sendMessage(channel, text, thread_ts);
+    return this.messageOps.sendMessage(channel, text, thread_ts, blocks);
   }
 
   async sendEphemeralMessage(
     channel: string,
     user: string,
     text: string,
-    thread_ts?: string
+    thread_ts?: string,
+    blocks?: (KnownBlock | Block)[]
   ): Promise<ChatPostEphemeralResponse> {
-    return this.messageOps.sendEphemeralMessage(channel, user, text, thread_ts);
+    return this.messageOps.sendEphemeralMessage(channel, user, text, thread_ts, blocks);
   }
 
   async scheduleMessage(
     channel: string,
     text: string,
     post_at: number,
-    thread_ts?: string
+    thread_ts?: string,
+    blocks?: (KnownBlock | Block)[]
   ): Promise<ChatScheduleMessageResponse> {
-    return this.messageOps.scheduleMessage(channel, text, post_at, thread_ts);
+    return this.messageOps.scheduleMessage(channel, text, post_at, thread_ts, blocks);
   }
 
-  async updateMessage(channel: string, ts: string, text: string): Promise<ChatUpdateResponse> {
-    return this.messageOps.updateMessage(channel, ts, text);
+  async updateMessage(
+    channel: string,
+    ts: string,
+    text: string,
+    blocks?: (KnownBlock | Block)[]
+  ): Promise<ChatUpdateResponse> {
+    return this.messageOps.updateMessage(channel, ts, text, blocks);
   }
 
   async deleteMessage(channel: string, ts: string): Promise<void> {
