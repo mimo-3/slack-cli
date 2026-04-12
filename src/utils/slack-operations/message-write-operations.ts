@@ -1,12 +1,10 @@
 import {
-  ChatPostEphemeralArguments,
   ChatPostEphemeralResponse,
-  ChatPostMessageArguments,
   ChatPostMessageResponse,
-  ChatScheduleMessageArguments,
   ChatScheduleMessageResponse,
   ChatUpdateResponse,
 } from '@slack/web-api';
+import type { Block, KnownBlock } from '@slack/types';
 import type { ScheduledMessage } from '../../types/slack';
 import { BaseSlackClient, SlackClientDependency } from './base-client';
 import { ChannelOperations } from './channel-operations';
@@ -23,56 +21,47 @@ export class MessageWriteOperations extends BaseSlackClient {
   async sendMessage(
     channel: string,
     text: string,
-    thread_ts?: string
+    thread_ts?: string,
+    blocks?: (KnownBlock | Block)[]
   ): Promise<ChatPostMessageResponse> {
-    const params: ChatPostMessageArguments = {
+    return await this.client.chat.postMessage({
       channel,
       text,
-    };
-
-    if (thread_ts) {
-      params.thread_ts = thread_ts;
-    }
-
-    return await this.client.chat.postMessage(params);
+      ...(thread_ts ? { thread_ts } : {}),
+      ...(blocks ? { blocks } : {}),
+    });
   }
 
   async sendEphemeralMessage(
     channel: string,
     user: string,
     text: string,
-    thread_ts?: string
+    thread_ts?: string,
+    blocks?: (KnownBlock | Block)[]
   ): Promise<ChatPostEphemeralResponse> {
-    const params: ChatPostEphemeralArguments = {
+    return await this.client.chat.postEphemeral({
       channel,
       user,
       text,
-    };
-
-    if (thread_ts) {
-      params.thread_ts = thread_ts;
-    }
-
-    return await this.client.chat.postEphemeral(params);
+      ...(thread_ts ? { thread_ts } : {}),
+      ...(blocks ? { blocks } : {}),
+    });
   }
 
   async scheduleMessage(
     channel: string,
     text: string,
     post_at: number,
-    thread_ts?: string
+    thread_ts?: string,
+    blocks?: (KnownBlock | Block)[]
   ): Promise<ChatScheduleMessageResponse> {
-    const params: ChatScheduleMessageArguments = {
+    return await this.client.chat.scheduleMessage({
       channel,
       text,
       post_at,
-    };
-
-    if (thread_ts) {
-      params.thread_ts = thread_ts;
-    }
-
-    return await this.client.chat.scheduleMessage(params);
+      ...(thread_ts ? { thread_ts } : {}),
+      ...(blocks ? { blocks } : {}),
+    });
   }
 
   async listScheduledMessages(channel?: string, limit = 50): Promise<ScheduledMessage[]> {
@@ -85,13 +74,19 @@ export class MessageWriteOperations extends BaseSlackClient {
     return (response.scheduled_messages || []) as ScheduledMessage[];
   }
 
-  async updateMessage(channel: string, ts: string, text: string): Promise<ChatUpdateResponse> {
+  async updateMessage(
+    channel: string,
+    ts: string,
+    text: string,
+    blocks?: (KnownBlock | Block)[]
+  ): Promise<ChatUpdateResponse> {
     const channelId = await this.channelOps.resolveChannelId(channel);
 
     return await this.client.chat.update({
       channel: channelId,
       ts,
       text,
+      ...(blocks ? { blocks } : {}),
     });
   }
 
