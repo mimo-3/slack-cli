@@ -249,3 +249,27 @@ export interface CanvasListOptions {
   format?: 'table' | 'simple' | 'json';
   profile?: string;
 }
+
+export interface DraftSaveOptions {
+  id?: string;
+  channel: string;
+  channelLabel?: string;
+  thread?: string;
+  message?: string;
+  file?: string;
+  blocks?: string;
+  blocksFile?: string;
+  note?: string;
+  format?: 'table' | 'simple' | 'json';
+  profile?: string;
+}
+
+export interface DraftListOptions {
+  format?: 'table' | 'simple' | 'json';
+  profile?: string;
+}
+
+export interface DraftShowOptions {
+  format?: 'table' | 'simple' | 'json';
+  profile?: string;
+}
