@@ -345,6 +345,49 @@ slack-cli canvas read -i F01234567890 --profile work
 slack-cli canvas list -c general --profile work
 ```
 
+### Drafts (local only)
+
+Save message drafts locally so an automated routine (e.g. a launchd job) can prepare replies
+without ever sending anything to Slack. Drafts are stored under `~/.slack-cli/drafts/` and are
+**never** delivered to Slack by this CLI — you review them and copy/paste into Slack yourself.
+
+```bash
+# Save a new draft for a channel
+slack-cli draft save -c C0ARY9ESLCX -m "お疲れさまです！"
+
+# Save a threaded reply draft with a human-readable label and a reviewer note
+slack-cli draft save \
+  -c C0ARY9ESLCX \
+  --channel-label "#dev-acejob" \
+  -t 1700000000.000100 \
+  -m "確認しました！" \
+  --note "田中さんへの返信"
+
+# Save a draft body from a file
+slack-cli draft save -c C0ARY9ESLCX -f /tmp/body.txt
+
+# Include Block Kit JSON
+slack-cli draft save -c C0ARY9ESLCX -m "fallback" --blocks-file /tmp/blocks.json
+
+# Update an existing draft (pass the id returned by save)
+slack-cli draft save --id draft_1713340000000_abc123 -c C0ARY9ESLCX -m "updated body"
+
+# Print the saved draft as JSON (useful for scripts)
+slack-cli draft save -c C0ARY9ESLCX -m "..." --format json
+
+# List saved drafts (newest first)
+slack-cli draft list
+slack-cli draft list --format json
+slack-cli draft list --format simple
+
+# Show one draft
+slack-cli draft show draft_1713340000000_abc123
+slack-cli draft show draft_1713340000000_abc123 --format json
+
+# Delete a draft after you've copied/sent it manually
+slack-cli draft delete draft_1713340000000_abc123
+```
+
 ### Other Commands
 
 ```bash

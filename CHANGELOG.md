@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.21.0] - 2026-04-17
+
+### Added
+- New `draft` command for saving local message drafts (`draft save`, `draft list`, `draft show`, `draft delete`). Drafts are stored under `~/.slack-cli/drafts/` and are never sent to Slack by this CLI — intended for automated routines that prepare replies for human review.
+
 ## [0.4.4] - 2026-02-22
 
 ### Changed
