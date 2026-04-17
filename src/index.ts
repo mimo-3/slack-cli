@@ -8,6 +8,7 @@ import { setupChannelCommand } from './commands/channel';
 import { setupChannelsCommand } from './commands/channels';
 import { setupConfigCommand } from './commands/config';
 import { setupDeleteCommand } from './commands/delete';
+import { setupDraftCommand } from './commands/draft';
 import { setupEditCommand } from './commands/edit';
 import { setupHistoryCommand } from './commands/history';
 import { setupInviteCommand } from './commands/invite';
@@ -68,6 +69,7 @@ export function createProgram(): Command {
   program.addCommand(setupReminderCommand());
   program.addCommand(setupBookmarkCommand());
   program.addCommand(setupCanvasCommand());
+  program.addCommand(setupDraftCommand());
 
   return program;
 }
