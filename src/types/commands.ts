@@ -84,7 +84,10 @@ export interface UploadOptions {
 export interface EditOptions {
   channel: string;
   ts: string;
-  message: string;
+  message?: string;
+  file?: string;
+  blocks?: string;
+  blocksFile?: string;
   profile?: string;
 }
 
