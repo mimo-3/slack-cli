@@ -59,21 +59,13 @@ export class FileOperations extends BaseSlackClient {
       params as unknown as Parameters<typeof this.client.files.uploadV2>[0]
     )) as unknown as {
       ok?: boolean;
-      file?: UploadedFileInfo;
-      files?: Array<UploadedFileInfo | { files?: UploadedFileInfo[] }>;
+      files?: Array<{ files?: UploadedFileInfo[] }>;
     };
 
     const collected: UploadedFileInfo[] = [];
-    if (response.file && response.file.id) {
-      collected.push(response.file);
-    }
-    if (Array.isArray(response.files)) {
-      for (const entry of response.files) {
-        if (entry && typeof entry === 'object' && 'files' in entry && Array.isArray(entry.files)) {
-          collected.push(...entry.files);
-        } else if (entry && (entry as UploadedFileInfo).id) {
-          collected.push(entry as UploadedFileInfo);
-        }
+    for (const entry of response.files ?? []) {
+      if (entry?.files) {
+        collected.push(...entry.files);
       }
     }
 
