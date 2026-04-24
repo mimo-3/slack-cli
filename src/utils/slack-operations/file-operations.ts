@@ -13,6 +13,20 @@ export interface UploadFileOptions {
   threadTs?: string;
 }
 
+export interface UploadedFileInfo {
+  id?: string;
+  name?: string;
+  title?: string;
+  permalink?: string;
+  permalink_public?: string;
+  url_private?: string;
+}
+
+export interface UploadFileResult {
+  ok?: boolean;
+  files: UploadedFileInfo[];
+}
+
 export class FileOperations extends BaseSlackClient {
   private channelOps: ChannelOperations;
 
@@ -21,7 +35,7 @@ export class FileOperations extends BaseSlackClient {
     this.channelOps = channelOps ?? new ChannelOperations(dependency);
   }
 
-  async uploadFile(options: UploadFileOptions): Promise<void> {
+  async uploadFile(options: UploadFileOptions): Promise<UploadFileResult> {
     const channelId = await this.channelOps.resolveChannelId(options.channel);
 
     const params: Record<string, unknown> = {
@@ -41,8 +55,28 @@ export class FileOperations extends BaseSlackClient {
     if (options.snippetType) params.snippet_type = options.snippetType;
     if (options.threadTs) params.thread_ts = options.threadTs;
 
-    await this.client.files.uploadV2(
+    const response = (await this.client.files.uploadV2(
       params as unknown as Parameters<typeof this.client.files.uploadV2>[0]
-    );
+    )) as unknown as {
+      ok?: boolean;
+      file?: UploadedFileInfo;
+      files?: Array<UploadedFileInfo | { files?: UploadedFileInfo[] }>;
+    };
+
+    const collected: UploadedFileInfo[] = [];
+    if (response.file && response.file.id) {
+      collected.push(response.file);
+    }
+    if (Array.isArray(response.files)) {
+      for (const entry of response.files) {
+        if (entry && typeof entry === 'object' && 'files' in entry && Array.isArray(entry.files)) {
+          collected.push(...entry.files);
+        } else if (entry && (entry as UploadedFileInfo).id) {
+          collected.push(entry as UploadedFileInfo);
+        }
+      }
+    }
+
+    return { ok: response.ok, files: collected };
   }
 }
