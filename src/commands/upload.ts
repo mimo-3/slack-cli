@@ -19,6 +19,7 @@ export function setupUploadCommand(): Command {
     .option('-m, --message <message>', 'Initial comment with the file')
     .option('--filetype <filetype>', 'Snippet type (e.g. python, javascript, csv)')
     .option('-t, --thread <thread>', 'Thread timestamp to upload as reply')
+    .option('--format <format>', 'Output format: text, json', 'text')
     .option('--profile <profile>', 'Use specific workspace profile')
     .hook(
       'preAction',
@@ -58,11 +59,14 @@ export function setupUploadCommand(): Command {
               filename: options.filename,
             });
 
-        console.log(chalk.green(`✓ File uploaded successfully to #${options.channel}`));
-
-        for (const f of result.files) {
-          if (f.id) console.log(`  file_id: ${f.id}`);
-          if (f.permalink) console.log(`  permalink: ${f.permalink}`);
+        if (options.format === 'json') {
+          console.log(JSON.stringify({ channel: options.channel, files: result.files }, null, 2));
+        } else {
+          console.log(chalk.green(`✓ File uploaded successfully to #${options.channel}`));
+          for (const f of result.files) {
+            if (f.id) console.log(`  file_id: ${f.id}`);
+            if (f.permalink) console.log(`  permalink: ${f.permalink}`);
+          }
         }
       })
     );
