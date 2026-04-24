@@ -38,29 +38,32 @@ export function setupUploadCommand(): Command {
         const profile = parseProfile(options.profile);
         const client = await createSlackClient(profile);
 
-        if (options.file) {
-          await client.uploadFile({
-            channel: options.channel,
-            filePath: options.file,
-            title: options.title,
-            initialComment: options.message,
-            snippetType: options.filetype,
-            threadTs: options.thread,
-            filename: options.filename,
-          });
-        } else {
-          await client.uploadFile({
-            channel: options.channel,
-            content: options.content!,
-            title: options.title,
-            initialComment: options.message,
-            snippetType: options.filetype,
-            threadTs: options.thread,
-            filename: options.filename,
-          });
-        }
+        const result = options.file
+          ? await client.uploadFile({
+              channel: options.channel,
+              filePath: options.file,
+              title: options.title,
+              initialComment: options.message,
+              snippetType: options.filetype,
+              threadTs: options.thread,
+              filename: options.filename,
+            })
+          : await client.uploadFile({
+              channel: options.channel,
+              content: options.content!,
+              title: options.title,
+              initialComment: options.message,
+              snippetType: options.filetype,
+              threadTs: options.thread,
+              filename: options.filename,
+            });
 
         console.log(chalk.green(`✓ File uploaded successfully to #${options.channel}`));
+
+        for (const f of result.files) {
+          if (f.id) console.log(`  file_id: ${f.id}`);
+          if (f.permalink) console.log(`  permalink: ${f.permalink}`);
+        }
       })
     );
 

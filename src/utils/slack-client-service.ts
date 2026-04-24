@@ -163,7 +163,7 @@ export class SlackApiClient {
     return this.messageOps.getPermalinks(channel, messageTimestamps);
   }
 
-  async uploadFile(options: UploadFileOptions): Promise<void> {
+  async uploadFile(options: UploadFileOptions) {
     return this.fileOps.uploadFile(options);
   }
 

@@ -71,6 +71,7 @@ class JsonHistoryFormatter extends JsonFormatter<HistoryFormatterOptions> {
         ts: message.ts,
         timestamp: formatTimestampFixed(message.ts),
         user: resolveUsername(message, users),
+        ...(message.user !== undefined && { user_id: message.user }),
         text: message.text || '(no text)',
         ...(message.thread_ts !== undefined && { thread_ts: message.thread_ts }),
         ...(message.reply_count !== undefined && { reply_count: message.reply_count }),

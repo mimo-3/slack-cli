@@ -99,6 +99,43 @@ describe('edit command', () => {
       expect(mockConfigManager.getConfig).toHaveBeenCalledWith('work');
       expect(SlackApiClient).toHaveBeenCalledWith('work-token');
     });
+
+    it('should update a message with Block Kit blocks', async () => {
+      vi.mocked(mockConfigManager.getConfig).mockResolvedValue({
+        token: 'test-token',
+        updatedAt: new Date().toISOString(),
+      });
+      vi.mocked(mockSlackClient.updateMessage).mockResolvedValue({
+        ok: true,
+        ts: '1234567890.123456',
+        channel: 'C1234567890',
+        text: 'fallback',
+      });
+
+      const blocksJson =
+        '[{"type":"section","text":{"type":"mrkdwn","text":"*updated*"}}]';
+
+      await program.parseAsync([
+        'node',
+        'slack-cli',
+        'edit',
+        '-c',
+        'general',
+        '--ts',
+        '1234567890.123456',
+        '-m',
+        'fallback',
+        '-b',
+        blocksJson,
+      ]);
+
+      expect(mockSlackClient.updateMessage).toHaveBeenCalledWith(
+        'general',
+        '1234567890.123456',
+        'fallback',
+        JSON.parse(blocksJson)
+      );
+    });
   });
 
   describe('validation', () => {
