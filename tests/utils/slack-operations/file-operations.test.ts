@@ -123,5 +123,65 @@ describe('FileOperations', () => {
         })
       ).rejects.toThrow('not_allowed_token_type');
     });
+
+    it('should collect files from nested response.files[].files[]', async () => {
+      mockClient.files.uploadV2.mockResolvedValue({
+        ok: true,
+        files: [
+          { ok: true, files: [{ id: 'F1', permalink: 'https://example.com/1' }] },
+          { ok: true, files: [{ id: 'F2', permalink: 'https://example.com/2' }] },
+        ],
+      });
+      vi.mocked(channelResolver.resolveChannelId).mockResolvedValue('C123456789');
+
+      const result = await fileOps.uploadFile({
+        channel: 'general',
+        filePath: '/path/to/file.txt',
+      });
+
+      expect(result.files).toEqual([
+        { id: 'F1', permalink: 'https://example.com/1' },
+        { id: 'F2', permalink: 'https://example.com/2' },
+      ]);
+    });
+
+    it('should return empty files array when response.files is missing', async () => {
+      mockClient.files.uploadV2.mockResolvedValue({ ok: true });
+      vi.mocked(channelResolver.resolveChannelId).mockResolvedValue('C123456789');
+
+      const result = await fileOps.uploadFile({
+        channel: 'general',
+        filePath: '/path/to/file.txt',
+      });
+
+      expect(result.files).toEqual([]);
+    });
+
+    it('should throw when response.ok is false', async () => {
+      mockClient.files.uploadV2.mockResolvedValue({ ok: false, error: 'not_in_channel' });
+      vi.mocked(channelResolver.resolveChannelId).mockResolvedValue('C123456789');
+
+      await expect(
+        fileOps.uploadFile({
+          channel: 'general',
+          filePath: '/path/to/file.txt',
+        })
+      ).rejects.toThrow('not_in_channel');
+    });
+
+    it('should throw when an entry has ok: false', async () => {
+      mockClient.files.uploadV2.mockResolvedValue({
+        ok: true,
+        files: [{ ok: false, error: 'file_too_large' }],
+      });
+      vi.mocked(channelResolver.resolveChannelId).mockResolvedValue('C123456789');
+
+      await expect(
+        fileOps.uploadFile({
+          channel: 'general',
+          filePath: '/path/to/file.txt',
+        })
+      ).rejects.toThrow('file_too_large');
+    });
   });
 });

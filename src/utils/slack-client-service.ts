@@ -1,10 +1,10 @@
+import type { Block, KnownBlock } from '@slack/types';
 import {
   ChatPostEphemeralResponse,
   ChatPostMessageResponse,
   ChatScheduleMessageResponse,
   ChatUpdateResponse,
 } from '@slack/web-api';
-import type { Block, KnownBlock } from '@slack/types';
 import type {
   CanvasFile,
   CanvasSection,
