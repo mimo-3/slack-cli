@@ -59,12 +59,20 @@ export class FileOperations extends BaseSlackClient {
       params as unknown as Parameters<typeof this.client.files.uploadV2>[0]
     )) as unknown as {
       ok?: boolean;
-      files?: Array<{ files?: UploadedFileInfo[] }>;
+      error?: string;
+      files?: Array<{ ok?: boolean; error?: string; files?: UploadedFileInfo[] }>;
     };
+
+    if (response.ok === false) {
+      throw new Error(response.error ?? 'files.uploadV2 failed');
+    }
 
     const collected: UploadedFileInfo[] = [];
     for (const entry of response.files ?? []) {
-      if (entry?.files) {
+      if (entry.ok === false) {
+        throw new Error(entry.error ?? 'completeUploadExternal failed');
+      }
+      if (entry.files) {
         collected.push(...entry.files);
       }
     }
