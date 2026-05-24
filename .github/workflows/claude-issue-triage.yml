@@ -11,7 +11,7 @@ jobs:
       github.event.issue.user.login != 'dependabot[bot]' &&
       !contains(join(github.event.issue.labels.*.name, ','), 'in-progress') &&
       !contains(join(github.event.issue.labels.*.name, ','), 'implemented')
-    runs-on: ubuntu-slim
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       issues: write
