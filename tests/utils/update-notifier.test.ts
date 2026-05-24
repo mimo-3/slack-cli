@@ -56,7 +56,7 @@ describe('update notifier', () => {
     const fetchImpl = vi.fn();
 
     await checkForUpdates({
-      packageName: '@urugus/slack-cli',
+      packageName: '@mimo-3/slack-cli',
       currentVersion: '1.0.0',
       fetchImpl: fetchImpl as unknown as typeof fetch,
     });
@@ -83,13 +83,13 @@ describe('update notifier', () => {
     });
 
     await checkForUpdates({
-      packageName: '@urugus/slack-cli',
+      packageName: '@mimo-3/slack-cli',
       currentVersion: '1.0.0',
       fetchImpl: fetchImpl as unknown as typeof fetch,
     });
 
     expect(fetchImpl).toHaveBeenCalledWith(
-      'https://registry.npmjs.org/%40urugus%2Fslack-cli/latest',
+      'https://registry.npmjs.org/%40mimo-3%2Fslack-cli/latest',
       expect.objectContaining({
         headers: { accept: 'application/json' },
       })
@@ -119,7 +119,7 @@ describe('update notifier', () => {
     );
 
     await checkForUpdates({
-      packageName: '@urugus/slack-cli',
+      packageName: '@mimo-3/slack-cli',
       currentVersion: '1.0.0',
     });
 
@@ -132,7 +132,7 @@ describe('update notifier', () => {
 
     await expect(
       checkForUpdates({
-        packageName: '@urugus/slack-cli',
+        packageName: '@mimo-3/slack-cli',
         currentVersion: '1.0.0',
         fetchImpl: fetchImpl as unknown as typeof fetch,
       })
@@ -146,7 +146,7 @@ describe('update notifier', () => {
     const fetchImpl = vi.fn();
 
     await checkForUpdates({
-      packageName: '@urugus/slack-cli',
+      packageName: '@mimo-3/slack-cli',
       currentVersion: '1.0.0',
       fetchImpl: fetchImpl as unknown as typeof fetch,
     });
@@ -160,7 +160,7 @@ describe('update notifier', () => {
     const fetchImpl = vi.fn();
 
     await checkForUpdates({
-      packageName: '@urugus/slack-cli',
+      packageName: '@mimo-3/slack-cli',
       currentVersion: '1.0.0',
       fetchImpl: fetchImpl as unknown as typeof fetch,
     });
@@ -177,7 +177,7 @@ describe('update notifier', () => {
     });
 
     await checkForUpdates({
-      packageName: '@urugus/slack-cli',
+      packageName: '@mimo-3/slack-cli',
       currentVersion: '1.0.0',
       fetchImpl: fetchImpl as unknown as typeof fetch,
     });
