@@ -462,7 +462,7 @@ describe('unread command', () => {
 
       const channelWithLastRead = {
         id: 'C08JFKGJPPE',
-        name: 'dev_kiban_jira',
+        name: 'engineering',
         is_channel: true,
         is_member: true,
         is_archived: false,
@@ -476,7 +476,7 @@ describe('unread command', () => {
       const unreadMessage = {
         ts: '1750646072.447069',
         user: 'U5F87BSGP',
-        text: "@Suguru Sakashita / 阪下 駿 transitioned ES-4359 ArgumentError: '発行者' is not a valid field_name in Clip",
+        text: '@alice transitioned PROJ-1234',
         type: 'message',
       };
 
@@ -488,14 +488,14 @@ describe('unread command', () => {
         displayedMessageCount: 1,
       });
 
-      await program.parseAsync(['node', 'slack-cli', 'unread', '--channel', 'dev_kiban_jira']);
+      await program.parseAsync(['node', 'slack-cli', 'unread', '--channel', 'engineering']);
 
-      expect(mockSlackClient.getChannelUnread).toHaveBeenCalledWith('dev_kiban_jira');
+      expect(mockSlackClient.getChannelUnread).toHaveBeenCalledWith('engineering');
       expect(mockConsole.logSpy).toHaveBeenCalledWith(
-        chalk.bold('#dev_kiban_jira: 1 unread messages')
+        chalk.bold('#engineering: 1 unread messages')
       );
       expect(mockConsole.logSpy).toHaveBeenCalledWith(
-        expect.stringContaining('transitioned ES-4359')
+        expect.stringContaining('transitioned PROJ-1234')
       );
     });
   });

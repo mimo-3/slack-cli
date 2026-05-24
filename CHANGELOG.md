@@ -87,7 +87,7 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 - Fixed unread message detection for channels where unread_count is 0 but messages exist after last_read timestamp
 - Always check messages after last_read timestamp for accurate unread count
-- Improved reliability of unread message detection for channels like dev_kiban_jira
+- Improved reliability of unread message detection for active channels
 
 ## [0.2.0] - 2025-06-23
 
