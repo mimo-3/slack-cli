@@ -18,6 +18,10 @@ export default defineConfig({
     },
     include: ['tests/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
     testTimeout: 10000,
+    env: {
+      FORCE_COLOR: '0',
+      NO_COLOR: '1',
+    },
   },
   resolve: {
     alias: {
