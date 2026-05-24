@@ -1,6 +1,6 @@
 {
-  "name": "@urugus/slack-cli",
-  "version": "0.20.21",
+  "name": "@mimo-3/slack-cli",
+  "version": "0.20.22",
   "description": "A command-line tool for sending messages to Slack",
   "main": "dist/index.js",
   "bin": {
@@ -24,6 +24,7 @@
   },
   "keywords": ["slack", "cli", "command-line", "messaging", "api"],
   "author": "urugus",
+  "contributors": ["mimo-3"],
   "publishConfig": {
     "access": "public"
   },
