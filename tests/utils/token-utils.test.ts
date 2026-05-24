@@ -44,7 +44,7 @@ describe('token-utils', () => {
     });
   });
 
-describe('maskToken', () => {
+  describe('maskToken', () => {
     it('should mask short tokens completely', () => {
       expect(maskToken('short')).toBe('****');
       expect(maskToken('123456789')).toBe('****');

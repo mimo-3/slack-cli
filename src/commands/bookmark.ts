@@ -8,7 +8,9 @@ import { parseFormat, parseLimit, parseProfile } from '../utils/option-parsers';
 import { createValidationHook, optionValidators } from '../utils/validators';
 
 export function setupBookmarkCommand(): Command {
-  const bookmarkCommand = new Command('bookmark').description('Manage saved items (save for later)');
+  const bookmarkCommand = new Command('bookmark').description(
+    'Manage saved items (save for later)'
+  );
 
   const addCommand = new Command('add')
     .description('Save a message for later')
