@@ -31,6 +31,16 @@ Token storage security:
 - A local master key is created at `~/.slack-cli-secrets/master.key` with owner-only permissions.
 - Existing `~/.slack-cli/master.key` files are migrated automatically on first use.
 - For ephemeral environments, you can supply `SLACK_CLI_MASTER_KEY` to override the local key.
+- **Legacy v0.x configs**: tokens stored before v0.20 used a fixed key derived from a hard-coded
+  string. They are upgraded to AES-256-GCM the first time a v0.20+ release reads them, but old
+  backups taken before that upgrade can be decrypted by anyone with access to the source code.
+  Discard any pre-0.20 backups after a successful upgrade. See [SECURITY.md](SECURITY.md) for
+  details.
+
+Trust boundary for file inputs:
+- `--file`/`-f` (e.g. `slack-cli upload -f ./report.csv`) and `--blocks-file` read paths with the
+  privileges of the invoking user. Do not pass untrusted paths from external systems; the CLI does
+  not sandbox or restrict the readable directory.
 
 ## Usage
 
@@ -92,6 +102,12 @@ slack-cli send --user @john -m "Hello via DM!"
 
 # Send DM by email
 slack-cli send --email john@example.com -m "Hello via DM!"
+
+# Send a Block Kit message (inline JSON)
+slack-cli send -c general --blocks '[{"type":"section","text":{"type":"mrkdwn","text":"*Release shipped* :tada:"}}]'
+
+# Send a Block Kit message from file
+slack-cli send -c general --blocks-file ./blocks.json
 ```
 
 ### List Channels
@@ -227,6 +243,13 @@ slack-cli search -q "release" --profile work
 # Edit a sent message
 slack-cli edit -c general --ts 1234567890.123456 -m "Updated message text"
 
+# Replace with Block Kit content (inline)
+slack-cli edit -c general --ts 1234567890.123456 \
+  --blocks '[{"type":"section","text":{"type":"mrkdwn","text":"*Edited*"}}]'
+
+# Replace with Block Kit content from file
+slack-cli edit -c general --ts 1234567890.123456 --blocks-file ./blocks.json
+
 # Use specific profile
 slack-cli edit -c general --ts 1234567890.123456 -m "Fixed typo" --profile work
 ```
@@ -255,6 +278,74 @@ slack-cli upload -c general --content 'console.log("hello")' --filename snippet.
 
 # Upload as a thread reply
 slack-cli upload -c general -f ./logs.txt -t 1234567890.123456
+
+# JSON output (returns file_id, permalink, etc. for scripting)
+slack-cli upload -c general -f ./report.csv --format json
+```
+
+### Channel Membership
+
+```bash
+# Join a channel
+slack-cli join -c general
+
+# Leave a channel
+slack-cli leave -c general
+
+# Invite one or more users to a channel
+slack-cli invite -c general --user @alice
+slack-cli invite -c general --user U01ABCDEF --user U01XYZDEF
+
+# Tolerate invalid user IDs and continue inviting valid ones
+slack-cli invite -c general --user U01ABCDEF --user invalid-id --force
+
+# List members of a channel
+slack-cli members -c general
+slack-cli members -c general --limit 200 --format json
+```
+
+### Ephemeral Messages
+
+```bash
+# Send an ephemeral message visible only to one user in a channel
+slack-cli send-ephemeral -c general -u U01ABCDEF -m "Heads up: build is red"
+
+# Reply in a thread
+slack-cli send-ephemeral -c general -u U01ABCDEF -m "FYI" -t 1719207629.000100
+```
+
+### Reminders
+
+```bash
+# Create a reminder at an absolute time
+slack-cli reminder create -m "Push the release" --at "2026-03-01 09:00"
+
+# Create a reminder after N minutes
+slack-cli reminder create -m "Stretch break" --after 60
+
+# List your reminders
+slack-cli reminder list
+slack-cli reminder list --format json
+
+# Mark a reminder as complete
+slack-cli reminder complete --id Rm12345678
+
+# Delete a reminder
+slack-cli reminder delete --id Rm12345678
+```
+
+### Bookmarks (Save for Later)
+
+```bash
+# Save a message for later
+slack-cli bookmark add -c general -t 1234567890.123456
+
+# List saved items
+slack-cli bookmark list
+slack-cli bookmark list --limit 50 --format json
+
+# Remove a saved item
+slack-cli bookmark remove -c general -t 1234567890.123456
 ```
 
 ### Reactions
@@ -302,6 +393,10 @@ slack-cli users info --id U01ABCDEF
 
 # Look up user by email address
 slack-cli users lookup --email user@example.com
+
+# Check user presence status (active/away)
+slack-cli users presence --id U01ABCDEF
+slack-cli users presence --name @alice --format json
 
 # Use specific profile
 slack-cli users list --profile work
@@ -375,14 +470,18 @@ printf '%s\n' "$NEW_TOKEN" | slack-cli config set --token-stdin
 
 ### send command
 
-| Option    | Short | Description                              |
-| --------- | ----- | ---------------------------------------- |
-| --channel | -c    | Target channel name or ID (required)     |
-| --message | -m    | Message to send                          |
-| --file    | -f    | File containing message content          |
-| --thread  | -t    | Thread timestamp to reply to             |
-| --at      |       | Schedule time (Unix seconds or ISO 8601) |
-| --after   |       | Schedule message after N minutes         |
+| Option        | Short | Description                                                |
+| ------------- | ----- | ---------------------------------------------------------- |
+| --channel     | -c    | Target channel name or ID (one of --channel/--user/--email) |
+| --user        |       | Send DM to user by username                                |
+| --email       |       | Send DM to user by email address                           |
+| --message     | -m    | Message to send                                            |
+| --file        | -f    | File containing message content                            |
+| --blocks      | -b    | Block Kit JSON array (inline string)                       |
+| --blocks-file |       | File containing Block Kit JSON array                       |
+| --thread      | -t    | Thread timestamp to reply to                               |
+| --at          |       | Schedule time (Unix seconds or ISO 8601)                   |
+| --after       |       | Schedule message after N minutes                           |
 
 ### channels command
 
@@ -426,11 +525,14 @@ printf '%s\n' "$NEW_TOKEN" | slack-cli config set --token-stdin
 
 ### edit command
 
-| Option    | Short | Description                                    |
-| --------- | ----- | ---------------------------------------------- |
-| --channel | -c    | Target channel name or ID (required)           |
-| --ts      |       | Message timestamp to edit (required)           |
-| --message | -m    | New message text (required)                    |
+| Option        | Short | Description                                                  |
+| ------------- | ----- | ------------------------------------------------------------ |
+| --channel     | -c    | Target channel name or ID (required)                         |
+| --ts          |       | Message timestamp to edit (required)                         |
+| --message     | -m    | New message text (one of --message/--file/--blocks/--blocks-file) |
+| --file        | -f    | File containing new message text                             |
+| --blocks      | -b    | Block Kit JSON array (inline string)                         |
+| --blocks-file |       | File containing Block Kit JSON array                         |
 
 ### delete command
 
@@ -441,16 +543,17 @@ printf '%s\n' "$NEW_TOKEN" | slack-cli config set --token-stdin
 
 ### upload command
 
-| Option     | Short | Description                                      |
-| ---------- | ----- | ------------------------------------------------ |
-| --channel  | -c    | Target channel name or ID (required)             |
-| --file     | -f    | File path to upload                              |
-| --content  |       | Text content to upload as snippet                |
-| --filename |       | Override filename                                |
-| --title    |       | File title                                       |
-| --message  | -m    | Initial comment with the file                    |
-| --filetype |       | Snippet type (e.g. python, javascript, csv)      |
-| --thread   | -t    | Thread timestamp to upload as reply              |
+| Option     | Short | Description                                         |
+| ---------- | ----- | --------------------------------------------------- |
+| --channel  | -c    | Target channel name or ID (required)                |
+| --file     | -f    | File path to upload                                 |
+| --content  |       | Text content to upload as snippet                   |
+| --filename |       | Override filename                                   |
+| --title    |       | File title                                          |
+| --message  | -m    | Initial comment with the file                       |
+| --filetype |       | Snippet type (e.g. python, javascript, csv)         |
+| --thread   | -t    | Thread timestamp to upload as reply                 |
+| --format   |       | Output format: table, simple, json (default: table) |
 
 ### reaction command
 
@@ -523,6 +626,87 @@ Subcommands: `list`, `cancel`
 | --------- | ----- | --------------------------------------- |
 | --channel | -c    | Channel name or ID (required)           |
 | --id      |       | Scheduled message ID (required)         |
+
+### invite command
+
+| Option    | Short | Description                                                       |
+| --------- | ----- | ----------------------------------------------------------------- |
+| --channel | -c    | Channel name or ID (required)                                     |
+| --user    | -u    | User ID or @username to invite (repeatable, at least one required) |
+| --force   |       | Continue inviting valid users even if some IDs are invalid        |
+
+### join / leave commands
+
+| Option    | Short | Description                          |
+| --------- | ----- | ------------------------------------ |
+| --channel | -c    | Channel name or ID (required)        |
+
+### members command
+
+| Option    | Short | Description                                         |
+| --------- | ----- | --------------------------------------------------- |
+| --channel | -c    | Channel name or ID (required)                       |
+| --limit   |       | Maximum number of members to list (default: 100)    |
+| --format  |       | Output format: table, simple, json (default: table) |
+
+### send-ephemeral command
+
+| Option    | Short | Description                                                |
+| --------- | ----- | ---------------------------------------------------------- |
+| --channel | -c    | Target channel name or ID (required)                       |
+| --user    | -u    | User ID who will see the ephemeral message (required)      |
+| --message | -m    | Message to send (required)                                 |
+| --thread  | -t    | Thread timestamp to reply to                               |
+
+### reminder command
+
+Subcommands: `create`, `list`, `complete`, `delete`
+
+#### reminder create
+
+| Option    | Short | Description                                            |
+| --------- | ----- | ------------------------------------------------------ |
+| --message | -m    | Reminder text (required)                               |
+| --at      |       | Absolute date/time (e.g. "2026-03-01 15:00")           |
+| --after   |       | Minutes from now                                       |
+
+#### reminder list
+
+| Option   | Short | Description                                         |
+| -------- | ----- | --------------------------------------------------- |
+| --format |       | Output format: table, simple, json (default: table) |
+
+#### reminder complete / reminder delete
+
+| Option | Short | Description                  |
+| ------ | ----- | ---------------------------- |
+| --id   |       | Reminder ID (required)       |
+
+### bookmark command
+
+Subcommands: `add`, `list`, `remove`
+
+#### bookmark add / bookmark remove
+
+| Option      | Short | Description                          |
+| ----------- | ----- | ------------------------------------ |
+| --channel   | -c    | Channel name or ID (required)        |
+| --timestamp | -t    | Message timestamp (required)         |
+
+#### bookmark list
+
+| Option   | Short | Description                                         |
+| -------- | ----- | --------------------------------------------------- |
+| --limit  |       | Number of items to display (default: 100)           |
+| --format |       | Output format: table, simple, json (default: table) |
+
+### users presence (sub-subcommand)
+
+| Option   | Short | Description                                         |
+| -------- | ----- | --------------------------------------------------- |
+| --id     |       | User ID (one of --id/--name)                        |
+| --name   |       | Username such as `@alice` (one of --id/--name)      |
+| --format |       | Output format: table, simple, json (default: table) |
 
 ### canvas command
 
