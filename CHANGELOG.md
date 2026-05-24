@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+> This project is a fork of [urugus/slack-cli](https://github.com/urugus/slack-cli). Entries below are from the upstream project; changes since the fork are tracked in GitHub Releases.
+
+## [0.20.22] - 2026-05-24
+
+### Changed
+- Renamed package from `@urugus/slack-cli` to `@mimo-3/slack-cli` to publish under the fork's npm scope
+- Added fork credit and Slack trademark disclaimer to README
+- Added fork author to LICENSE alongside the original copyright holder
+
 ## [0.4.4] - 2026-02-22
 
 ### Changed
