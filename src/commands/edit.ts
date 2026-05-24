@@ -1,7 +1,7 @@
+import type { Block, KnownBlock } from '@slack/types';
 import chalk from 'chalk';
 import { Command } from 'commander';
 import * as fs from 'fs/promises';
-import type { Block, KnownBlock } from '@slack/types';
 import { EditOptions } from '../types/commands';
 import { createSlackClient } from '../utils/client-factory';
 import { wrapCommand } from '../utils/command-wrapper';
@@ -57,10 +57,7 @@ export function setupEditCommand(): Command {
               throw new FileError(ERROR_MESSAGES.INVALID_BLOCKS_JSON);
             }
             throw new FileError(
-              ERROR_MESSAGES.BLOCKS_FILE_READ_ERROR(
-                options.blocksFile,
-                extractErrorMessage(error)
-              )
+              ERROR_MESSAGES.BLOCKS_FILE_READ_ERROR(options.blocksFile, extractErrorMessage(error))
             );
           }
         } else if (options.blocks) {
