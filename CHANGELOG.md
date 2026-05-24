@@ -4,6 +4,39 @@ All notable changes to this project will be documented in this file.
 
 > This project is a fork of [urugus/slack-cli](https://github.com/urugus/slack-cli). Entries below are from the upstream project; changes since the fork are tracked in GitHub Releases.
 
+## [0.22.0] - 2026-05-24
+
+### Added
+- `SECURITY.md` with a private vulnerability reporting policy and notes on legacy token storage
+- `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1)
+- Issue templates (bug report, feature request) and pull request template
+- `repository`, `bugs`, `homepage` fields in `package.json`
+- README sections for `invite`, `join`, `leave`, `members`, `send-ephemeral`, `reminder`,
+  `bookmark`, and `users presence`; option tables updated for `send --blocks/--blocks-file`,
+  `edit --blocks/--blocks-file/--file`, and `upload --format`
+- README notes on legacy v0.x token storage and on the file-path trust boundary
+- Stack-trace token masking in `command-wrapper` (redacts `xox*-…` patterns when `NODE_ENV=development`)
+
+### Changed
+- Regenerated `package-lock.json` to resolve known `axios` advisories (HIGH); `npm audit` now reports 0 vulnerabilities
+- Hardened `claude-issue-triage` workflow against prompt injection by passing the issue body through
+  `gh issue view` instead of embedding `${{ github.event.issue.body }}` directly in the prompt
+- Replaced `ubuntu-slim` with `ubuntu-latest` across all GitHub Actions workflows
+- Translated the lone Japanese error message in `bookmark` to English for consistency
+- Replaced upstream-derived `dev_kiban_jira` channel names in tests with the generic `engineering`
+- Migrated `biome.json` `$schema` to match the installed Biome CLI version
+
+## [0.21.0] - 2026-05-24
+
+### Added
+- `send --blocks <json>` and `send --blocks-file <file>` to post Block Kit messages
+- `edit --blocks <json>`, `edit --blocks-file <file>`, and `edit --file <file>` to update messages
+  with Block Kit content or content read from a file
+- `upload --format <table|simple|json>` for machine-readable upload output (returns `file_id`,
+  `permalink`, etc.)
+- `history --format json` output now includes `user_id` for each message
+- `upload` now returns the underlying Slack file metadata (file_id, permalink, etc.) regardless of format
+
 ## [0.20.22] - 2026-05-24
 
 ### Changed
@@ -54,7 +87,7 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 - Fixed unread message detection for channels where unread_count is 0 but messages exist after last_read timestamp
 - Always check messages after last_read timestamp for accurate unread count
-- Improved reliability of unread message detection for channels like dev_kiban_jira
+- Improved reliability of unread message detection for active channels
 
 ## [0.2.0] - 2025-06-23
 
