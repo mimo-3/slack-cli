@@ -2,10 +2,14 @@
 
 A command-line tool for sending messages to Slack using the Slack API.
 
+> This project is a fork of [urugus/slack-cli](https://github.com/urugus/slack-cli), with additional features and modifications.
+
+> **Disclaimer**: This is an unofficial tool and is not affiliated with, endorsed by, or sponsored by Slack Technologies, LLC. "Slack" is a trademark of Slack Technologies, LLC.
+
 ## Installation
 
 ```bash
-npm install -g @urugus/slack-cli
+npm install -g @mimo-3/slack-cli
 ```
 
 By default, when you run commands, the CLI will show an update notification if a new npm release is available. To disable this, set `SLACK_CLI_DISABLE_UPDATE_NOTIFIER=1`.
