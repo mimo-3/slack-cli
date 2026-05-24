@@ -1,10 +1,10 @@
+import type { Block, KnownBlock } from '@slack/types';
 import {
   ChatPostEphemeralResponse,
   ChatPostMessageResponse,
   ChatScheduleMessageResponse,
   ChatUpdateResponse,
 } from '@slack/web-api';
-import type { Block, KnownBlock } from '@slack/types';
 import type { ScheduledMessage } from '../../types/slack';
 import { BaseSlackClient, SlackClientDependency } from './base-client';
 import { ChannelOperations } from './channel-operations';

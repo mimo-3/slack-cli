@@ -112,8 +112,7 @@ describe('edit command', () => {
         text: 'fallback',
       });
 
-      const blocksJson =
-        '[{"type":"section","text":{"type":"mrkdwn","text":"*updated*"}}]';
+      const blocksJson = '[{"type":"section","text":{"type":"mrkdwn","text":"*updated*"}}]';
 
       await program.parseAsync([
         'node',

@@ -3,10 +3,17 @@ import { Command } from 'commander';
 import * as fs from 'fs/promises';
 import { UploadOptions } from '../types/commands';
 import { createSlackClient } from '../utils/client-factory';
+import { renderByFormat } from '../utils/command-support';
 import { wrapCommand } from '../utils/command-wrapper';
 import { FileError } from '../utils/errors';
 import { parseProfile } from '../utils/option-parsers';
+import type { UploadedFileInfo } from '../utils/slack-operations/file-operations';
 import { createValidationHook, optionValidators } from '../utils/validators';
+
+interface UploadOutput {
+  channel: string;
+  files: UploadedFileInfo[];
+}
 
 export function setupUploadCommand(): Command {
   const uploadCommand = new Command('upload')
@@ -19,10 +26,15 @@ export function setupUploadCommand(): Command {
     .option('-m, --message <message>', 'Initial comment with the file')
     .option('--filetype <filetype>', 'Snippet type (e.g. python, javascript, csv)')
     .option('-t, --thread <thread>', 'Thread timestamp to upload as reply')
+    .option('--format <format>', 'Output format: table, simple, json', 'table')
     .option('--profile <profile>', 'Use specific workspace profile')
     .hook(
       'preAction',
-      createValidationHook([optionValidators.fileOrContent, optionValidators.uploadThreadTimestamp])
+      createValidationHook([
+        optionValidators.fileOrContent,
+        optionValidators.uploadThreadTimestamp,
+        optionValidators.format,
+      ])
     )
     .action(
       wrapCommand(async (options: UploadOptions) => {
@@ -58,12 +70,20 @@ export function setupUploadCommand(): Command {
               filename: options.filename,
             });
 
-        console.log(chalk.green(`✓ File uploaded successfully to #${options.channel}`));
+        const output: UploadOutput = {
+          channel: options.channel,
+          files: result.files,
+        };
 
-        for (const f of result.files) {
-          if (f.id) console.log(`  file_id: ${f.id}`);
-          if (f.permalink) console.log(`  permalink: ${f.permalink}`);
-        }
+        renderByFormat<UploadOutput>(options, output, {
+          table: (data) => {
+            console.log(chalk.green(`✓ File uploaded successfully to #${data.channel}`));
+            for (const f of data.files) {
+              if (f.id) console.log(`  file_id: ${f.id}`);
+              if (f.permalink) console.log(`  permalink: ${f.permalink}`);
+            }
+          },
+        });
       })
     );
 

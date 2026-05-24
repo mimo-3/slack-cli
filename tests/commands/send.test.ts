@@ -113,7 +113,12 @@ describe('send command', () => {
       await program.parseAsync(['node', 'slack-cli', 'send', '-c', 'general', '-f', 'message.txt']);
 
       expect(fs.readFile).toHaveBeenCalledWith('message.txt', 'utf-8');
-      expect(mockSlackClient.sendMessage).toHaveBeenCalledWith('general', fileContent, undefined, undefined);
+      expect(mockSlackClient.sendMessage).toHaveBeenCalledWith(
+        'general',
+        fileContent,
+        undefined,
+        undefined
+      );
     });
   });
 

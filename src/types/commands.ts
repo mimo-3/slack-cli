@@ -78,6 +78,7 @@ export interface UploadOptions {
   message?: string;
   filetype?: string;
   thread?: string;
+  format?: 'table' | 'simple' | 'json';
   profile?: string;
 }
 

@@ -3,7 +3,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setupUploadCommand } from '../../src/commands/upload';
 import { ProfileConfigManager } from '../../src/utils/profile-config';
 import { SlackApiClient } from '../../src/utils/slack-api-client';
+import type { UploadFileResult } from '../../src/utils/slack-operations/file-operations';
 import { createTestProgram, restoreMocks, setupMockConsole } from '../test-utils';
+
+const fakeUploadResult: UploadFileResult = {
+  ok: true,
+  files: [{ id: 'F123', permalink: 'https://slack.com/files/F123' }],
+};
 
 vi.mock('../../src/utils/slack-api-client');
 vi.mock('../../src/utils/profile-config');
@@ -44,7 +50,7 @@ describe('upload command', () => {
         updatedAt: new Date().toISOString(),
       });
       vi.mocked(fs.access).mockResolvedValue(undefined);
-      vi.mocked(mockSlackClient.uploadFile).mockResolvedValue();
+      vi.mocked(mockSlackClient.uploadFile).mockResolvedValue(fakeUploadResult);
 
       await program.parseAsync([
         'node',
@@ -68,6 +74,10 @@ describe('upload command', () => {
       expect(mockConsole.logSpy).toHaveBeenCalledWith(
         expect.stringContaining('File uploaded successfully to #general')
       );
+      expect(mockConsole.logSpy).toHaveBeenCalledWith(expect.stringContaining('file_id: F123'));
+      expect(mockConsole.logSpy).toHaveBeenCalledWith(
+        expect.stringContaining('permalink: https://slack.com/files/F123')
+      );
     });
 
     it('should upload with all options', async () => {
@@ -76,7 +86,7 @@ describe('upload command', () => {
         updatedAt: new Date().toISOString(),
       });
       vi.mocked(fs.access).mockResolvedValue(undefined);
-      vi.mocked(mockSlackClient.uploadFile).mockResolvedValue();
+      vi.mocked(mockSlackClient.uploadFile).mockResolvedValue(fakeUploadResult);
 
       await program.parseAsync([
         'node',
@@ -112,7 +122,7 @@ describe('upload command', () => {
         token: 'test-token',
         updatedAt: new Date().toISOString(),
       });
-      vi.mocked(mockSlackClient.uploadFile).mockResolvedValue();
+      vi.mocked(mockSlackClient.uploadFile).mockResolvedValue(fakeUploadResult);
 
       await program.parseAsync([
         'node',
@@ -143,7 +153,7 @@ describe('upload command', () => {
         updatedAt: new Date().toISOString(),
       });
       vi.mocked(fs.access).mockResolvedValue(undefined);
-      vi.mocked(mockSlackClient.uploadFile).mockResolvedValue();
+      vi.mocked(mockSlackClient.uploadFile).mockResolvedValue(fakeUploadResult);
 
       await program.parseAsync([
         'node',
@@ -162,7 +172,51 @@ describe('upload command', () => {
     });
   });
 
+  describe('output formatting', () => {
+    it('should output JSON when --format json is specified', async () => {
+      vi.mocked(mockConfigManager.getConfig).mockResolvedValue({
+        token: 'test-token',
+        updatedAt: new Date().toISOString(),
+      });
+      vi.mocked(fs.access).mockResolvedValue(undefined);
+      vi.mocked(mockSlackClient.uploadFile).mockResolvedValue(fakeUploadResult);
+
+      await program.parseAsync([
+        'node',
+        'slack-cli',
+        'upload',
+        '-c',
+        'general',
+        '-f',
+        '/path/to/file.txt',
+        '--format',
+        'json',
+      ]);
+
+      const jsonCall = mockConsole.logSpy.mock.calls
+        .map((args) => args[0])
+        .find((line): line is string => typeof line === 'string' && line.startsWith('{'));
+
+      expect(jsonCall).toBeDefined();
+      expect(JSON.parse(jsonCall as string)).toEqual({
+        channel: 'general',
+        files: [{ id: 'F123', permalink: 'https://slack.com/files/F123' }],
+      });
+    });
+  });
+
   describe('validation', () => {
+    it('should reject invalid --format value', async () => {
+      const uploadCommand = setupUploadCommand();
+      uploadCommand.exitOverride();
+
+      await expect(
+        uploadCommand.parseAsync(['-c', 'general', '-f', 'file.txt', '--format', 'yaml'], {
+          from: 'user',
+        })
+      ).rejects.toThrow(/Invalid format/);
+    });
+
     it('should fail when neither file nor content is provided', async () => {
       const uploadCommand = setupUploadCommand();
       uploadCommand.exitOverride();
