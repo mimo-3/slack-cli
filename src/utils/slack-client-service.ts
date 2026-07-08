@@ -28,10 +28,7 @@ import type {
 import { createSlackClientContext } from './slack-operations/base-client';
 import { CanvasOperations } from './slack-operations/canvas-operations';
 import { ChannelOperations } from './slack-operations/channel-operations';
-import type {
-  DownloadFileOptions,
-  UploadFileOptions,
-} from './slack-operations/file-operations';
+import type { DownloadFileOptions, UploadFileOptions } from './slack-operations/file-operations';
 import { FileOperations } from './slack-operations/file-operations';
 import { MessageOperations } from './slack-operations/message-operations';
 import { PinOperations } from './slack-operations/pin-operations';

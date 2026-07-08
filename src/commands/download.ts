@@ -19,7 +19,10 @@ export function setupDownloadCommand(): Command {
     .description('Download a file from Slack')
     .option('-u, --url <url>', 'File URL (url_private or url_private_download from message)')
     .option('-i, --id <id>', 'Slack file ID (e.g. F0BFXAEP1UZ)')
-    .option('-o, --output <path>', 'Output file path (defaults to original filename in current dir)')
+    .option(
+      '-o, --output <path>',
+      'Output file path (defaults to original filename in current dir)'
+    )
     .option('--format <format>', 'Output format: table, simple, json', 'table')
     .option('--profile <profile>', 'Use specific workspace profile')
     .hook(

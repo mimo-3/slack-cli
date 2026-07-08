@@ -1,6 +1,6 @@
 {
   "name": "@mimo-3/slack-cli",
-  "version": "0.22.0",
+  "version": "0.22.1",
   "description": "A command-line tool for sending messages to Slack",
   "main": "dist/index.js",
   "bin": {
@@ -20,6 +20,7 @@
     "format:check": "biome check .",
     "check": "biome check .",
     "check:fix": "biome check --write .",
+    "prepare": "npm run build",
     "prepublishOnly": "npm run build"
   },
   "keywords": ["slack", "cli", "command-line", "messaging", "api"],
