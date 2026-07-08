@@ -173,6 +173,18 @@ export interface HistoryOptions {
   oldest?: string;
 }
 
+export interface FileAttachment {
+  id: string;
+  name?: string;
+  title?: string;
+  mimetype?: string;
+  filetype?: string;
+  size?: number;
+  url_private?: string;
+  url_private_download?: string;
+  permalink?: string;
+}
+
 export interface Message {
   type: string;
   text?: string;
@@ -183,6 +195,7 @@ export interface Message {
   reply_count?: number;
   attachments?: unknown[];
   blocks?: unknown[];
+  files?: FileAttachment[];
 }
 
 export interface ScheduledMessage {
