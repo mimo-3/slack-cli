@@ -253,3 +253,11 @@ export interface CanvasListOptions {
   format?: 'table' | 'simple' | 'json';
   profile?: string;
 }
+
+export interface DownloadOptions {
+  url?: string;
+  id?: string;
+  output?: string;
+  format?: 'table' | 'simple' | 'json';
+  profile?: string;
+}
