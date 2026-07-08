@@ -1,9 +1,23 @@
 import chalk from 'chalk';
-import { Message as SlackMessage } from '../../types/slack';
+import { FileAttachment, Message as SlackMessage } from '../../types/slack';
 import { formatTimestampFixed } from '../date-utils';
 import { formatMessageWithMentions, resolveUsername } from '../format-utils';
 import { sanitizeTerminalText } from '../terminal-sanitizer';
 import { AbstractFormatter, createFormatterFactory, JsonFormatter } from './base-formatter';
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function formatFileLabel(file: FileAttachment): string {
+  const name = file.name || file.title || 'unnamed';
+  const parts = [name];
+  if (file.mimetype) parts.push(file.mimetype);
+  if (file.size !== undefined) parts.push(formatFileSize(file.size));
+  return parts.join(', ');
+}
 
 export interface HistoryFormatterOptions {
   channelName: string;
@@ -31,6 +45,14 @@ class TableHistoryFormatter extends AbstractFormatter<HistoryFormatterOptions> {
       console.log(`${chalk.gray(`[${timestamp}]`)} ${chalk.cyan(username)}`);
       const text = message.text ? formatMessageWithMentions(message.text, users) : '(no text)';
       console.log(text);
+      if (message.files && message.files.length > 0) {
+        message.files.forEach((file) => {
+          const label = formatFileLabel(file);
+          const url = file.url_private_download || file.url_private || file.permalink || '';
+          const urlPart = url ? ` ${chalk.blue(sanitizeTerminalText(url))}` : '';
+          console.log(chalk.yellow(`  📎 ${sanitizeTerminalText(label)}`) + urlPart);
+        });
+      }
       if (permalinks?.has(message.ts)) {
         console.log(chalk.blue(sanitizeTerminalText(permalinks.get(message.ts)!)));
       }
@@ -56,7 +78,9 @@ class SimpleHistoryFormatter extends AbstractFormatter<HistoryFormatterOptions> 
       const text = message.text ? formatMessageWithMentions(message.text, users) : '(no text)';
       const link = permalinks?.get(message.ts);
       const linkSuffix = link ? ` ${sanitizeTerminalText(link)}` : '';
-      console.log(`[${timestamp}] ${username}: ${text}${linkSuffix}`);
+      const fileNames = (message.files || []).map((f) => f.name || f.title || 'unnamed');
+      const fileSuffix = fileNames.length > 0 ? ` [📎 ${fileNames.join(', ')}]` : '';
+      console.log(`[${timestamp}] ${username}: ${text}${fileSuffix}${linkSuffix}`);
     });
   }
 }
@@ -75,6 +99,17 @@ class JsonHistoryFormatter extends JsonFormatter<HistoryFormatterOptions> {
         text: message.text || '(no text)',
         ...(message.thread_ts !== undefined && { thread_ts: message.thread_ts }),
         ...(message.reply_count !== undefined && { reply_count: message.reply_count }),
+        ...(message.files &&
+          message.files.length > 0 && {
+            files: message.files.map((f) => ({
+              id: f.id,
+              name: f.name,
+              mimetype: f.mimetype,
+              filetype: f.filetype,
+              size: f.size,
+              url: f.url_private_download || f.url_private || f.permalink,
+            })),
+          }),
         ...(permalinks?.has(message.ts) && { permalink: permalinks.get(message.ts) }),
       })),
       total: messages.length,
