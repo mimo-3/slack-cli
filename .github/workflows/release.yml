@@ -4,8 +4,13 @@ on:
   push:
     branches: [main]
 
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 permissions:
   contents: write
+  id-token: write
 
 jobs:
   release:
@@ -15,6 +20,11 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
+
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
 
       - name: Get version from package.json
         id: version
@@ -31,6 +41,21 @@ jobs:
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Check if version is already on npm
+        id: check_npm
+        run: |
+          if npm view "@mimo-3/slack-cli@${{ steps.version.outputs.version }}" version >/dev/null 2>&1; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "published=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish to npm
+        if: steps.check_npm.outputs.published == 'false'
+        run: |
+          npm ci
+          npm publish
 
       - name: Create GitHub Release
         if: steps.check_tag.outputs.exists == 'false'
