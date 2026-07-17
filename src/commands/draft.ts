@@ -159,8 +159,12 @@ export function setupDraftCommand(): Command {
         console.log(chalk.green(`✓ Draft sent to ${formatTarget(draft)}`));
 
         if (!options.keep) {
-          await store.delete(draft.id);
-          console.log(chalk.gray(`Draft ${draft.id} deleted`));
+          try {
+            await store.delete(draft.id);
+            console.log(chalk.gray(`Draft ${draft.id} deleted`));
+          } catch {
+            console.log(chalk.yellow(`⚠ Message sent, but failed to delete draft ${draft.id}`));
+          }
         }
       })
     );
