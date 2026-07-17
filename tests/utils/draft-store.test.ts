@@ -62,6 +62,27 @@ describe('DraftStore', () => {
     });
   });
 
+  describe('file safety', () => {
+    it('should write drafts.json with owner-only permissions', async () => {
+      await store.save({ channel: 'general', message: 'hello' });
+
+      const stat = await fs.stat(path.join(tmpDir, 'drafts.json'));
+      expect(stat.mode & 0o777).toBe(0o600);
+    });
+
+    it('should skip malformed entries in drafts.json', async () => {
+      await fs.writeFile(
+        path.join(tmpDir, 'drafts.json'),
+        JSON.stringify([{ id: 'ok', message: 'valid' }, { broken: true }, 'garbage'])
+      );
+
+      const drafts = await store.list();
+
+      expect(drafts).toHaveLength(1);
+      expect(drafts[0].id).toBe('ok');
+    });
+  });
+
   describe('list', () => {
     it('should return empty array when no drafts exist', async () => {
       const drafts = await store.list();

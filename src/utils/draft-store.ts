@@ -37,8 +37,8 @@ export class DraftStore {
   async save(input: DraftInput): Promise<Draft> {
     const drafts = await this.readDrafts();
     const draft: Draft = {
-      id: this.generateId(drafts),
       ...input,
+      id: this.generateId(drafts),
       createdAt: new Date().toISOString(),
     };
     drafts.push(draft);
@@ -76,7 +76,16 @@ export class DraftStore {
     try {
       const data = await fs.readFile(this.draftsPath, 'utf-8');
       const parsed = JSON.parse(data);
-      return Array.isArray(parsed) ? parsed : [];
+      if (!Array.isArray(parsed)) {
+        return [];
+      }
+      return parsed.filter(
+        (entry): entry is Draft =>
+          typeof entry === 'object' &&
+          entry !== null &&
+          typeof entry.id === 'string' &&
+          typeof entry.message === 'string'
+      );
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
         return [];
@@ -87,8 +96,20 @@ export class DraftStore {
 
   private async writeDrafts(drafts: Draft[]): Promise<void> {
     await fs.mkdir(this.configDir, { recursive: true, mode: FILE_PERMISSIONS.CONFIG_DIR });
-    await fs.writeFile(this.draftsPath, JSON.stringify(drafts, null, 2), {
+    await fs.chmod(this.configDir, FILE_PERMISSIONS.CONFIG_DIR);
+
+    // Write to a temp file and rename so a crash never leaves a half-written drafts.json
+    const tempPath = `${this.draftsPath}.${process.pid}.${Date.now()}.tmp`;
+    await fs.writeFile(tempPath, JSON.stringify(drafts, null, 2), {
+      encoding: 'utf-8',
       mode: FILE_PERMISSIONS.CONFIG_FILE,
+      flag: 'wx',
     });
+    try {
+      await fs.rename(tempPath, this.draftsPath);
+    } catch (error) {
+      await fs.unlink(tempPath).catch(() => undefined);
+      throw error;
+    }
   }
 }
