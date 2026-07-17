@@ -422,6 +422,37 @@ slack-cli scheduled list --format simple
 slack-cli scheduled cancel -c general --id Q1298393284
 ```
 
+### Drafts
+
+Drafts are stored locally in `~/.slack-cli/drafts.json` (Slack does not expose a public API for drafts).
+
+```bash
+# Save a draft for a channel
+slack-cli draft save -c general -m "Draft message"
+
+# Save a draft for a DM
+slack-cli draft save --user alice -m "Draft DM"
+
+# Save a draft as a thread reply
+slack-cli draft save -c general -m "Reply draft" -t 1234567890.123456
+
+# List drafts
+slack-cli draft list
+slack-cli draft list --format json
+
+# Show the full content of a draft
+slack-cli draft show --id a1b2c3d4
+
+# Send a draft (deleted after sending by default)
+slack-cli draft send --id a1b2c3d4
+
+# Send a draft but keep it
+slack-cli draft send --id a1b2c3d4 --keep
+
+# Delete a draft
+slack-cli draft delete --id a1b2c3d4
+```
+
 ### Canvases
 
 ```bash
@@ -626,6 +657,33 @@ Subcommands: `list`, `cancel`
 | --------- | ----- | --------------------------------------- |
 | --channel | -c    | Channel name or ID (required)           |
 | --id      |       | Scheduled message ID (required)         |
+
+### draft command
+
+Subcommands: `save`, `list`, `show`, `send`, `delete`
+
+#### draft save
+
+| Option    | Short | Description                                       |
+| --------- | ----- | ------------------------------------------------- |
+| --channel | -c    | Target channel name or ID                         |
+| --user    |       | Target user for DM (exclusive with --channel)     |
+| --message | -m    | Message content (required)                        |
+| --thread  | -t    | Thread timestamp to reply to                      |
+
+#### draft list
+
+| Option   | Short | Description                                         |
+| -------- | ----- | --------------------------------------------------- |
+| --format |       | Output format: table, simple, json (default: table) |
+
+#### draft show / send / delete
+
+| Option    | Short | Description                                   |
+| --------- | ----- | --------------------------------------------- |
+| --id      |       | Draft ID (required)                           |
+| --keep    |       | (send only) Keep the draft after sending      |
+| --profile |       | (send only) Use specific workspace profile    |
 
 ### invite command
 
