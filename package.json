@@ -1,12 +1,14 @@
 {
   "name": "@mimo-3/slack-cli",
-  "version": "0.22.1",
+  "version": "0.23.0",
   "description": "A command-line tool for sending messages to Slack",
   "main": "dist/index.js",
   "bin": {
     "slack-cli": "dist/index.js"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "ts-node src/index.ts",
@@ -23,9 +25,18 @@
     "prepare": "npm run build",
     "prepublishOnly": "npm run build"
   },
-  "keywords": ["slack", "cli", "command-line", "messaging", "api"],
+  "keywords": [
+    "slack",
+    "cli",
+    "command-line",
+    "messaging",
+    "api"
+  ],
   "author": "mimo-3 (fork of urugus/slack-cli)",
-  "contributors": ["urugus", "mimo-3"],
+  "contributors": [
+    "urugus",
+    "mimo-3"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/mimo-3/slack-cli.git"
