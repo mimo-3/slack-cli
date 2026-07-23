@@ -10,13 +10,14 @@ export function wrapCommand<T = unknown>(action: CommandAction<T>): CommandActio
     try {
       await action(options);
     } catch (error) {
+      // Sanitize first so tokens split by injected escape sequences are still redacted.
       console.error(
         chalk.red('✗ Error:'),
-        sanitizeTerminalText(redactSlackTokens(extractErrorMessage(error)))
+        redactSlackTokens(sanitizeTerminalText(extractErrorMessage(error)))
       );
 
       if (process.env.NODE_ENV === 'development' && error instanceof Error) {
-        console.error(chalk.gray(sanitizeTerminalText(redactSlackTokens(error.stack) ?? '')));
+        console.error(chalk.gray(redactSlackTokens(sanitizeTerminalText(error.stack ?? ''))));
       }
 
       process.exit(1);

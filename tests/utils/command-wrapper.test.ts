@@ -68,4 +68,18 @@ describe('wrapCommand', () => {
     expect(message).not.toContain(fakeToken);
     expect(message).toContain('invalid_auth');
   });
+
+  it('should redact tokens split by injected escape sequences', async () => {
+    const tokenHead = ['xoxb', '12345'].join('-');
+    const tokenTail = '67890-abcdefghij';
+    const action = vi
+      .fn()
+      .mockRejectedValue(new Error(`invalid_auth: ${tokenHead}[0m${tokenTail}`));
+
+    await wrapCommand(action)({});
+
+    const message = errorSpy.mock.calls[0][1] as string;
+    expect(message).not.toContain(tokenTail);
+    expect(message).toContain('invalid_auth');
+  });
 });
