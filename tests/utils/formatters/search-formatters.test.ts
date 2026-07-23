@@ -136,4 +136,40 @@ describe('SearchFormatters', () => {
       expect(mockConsole).toHaveBeenCalled();
     });
   });
+
+  describe('single-line output hardening', () => {
+    const matchWithNewline: SearchMatch = {
+      text: 'first line\nfake-row',
+      user: 'U123',
+      username: 'john.doe',
+      ts: '1609459200.000100',
+      channel: { id: 'C123', name: 'general' },
+      permalink: 'https://slack.com/archives/C123/p1609459200000100',
+    };
+
+    it('should keep each simple format match on a single line', () => {
+      mockConsole.mockClear();
+      const formatter = createSearchFormatter('simple');
+      formatter.format(createOptions({ matches: [matchWithNewline], totalCount: 1 }));
+
+      const matchLine = mockConsole.mock.calls
+        .map((call) => call[0] as string)
+        .find((line) => line.includes('john.doe'));
+      expect(matchLine).toBeDefined();
+      expect(matchLine).not.toContain('\n');
+      expect(matchLine).toContain('first line fake-row');
+    });
+
+    it('should keep each table format match on a single line', () => {
+      mockConsole.mockClear();
+      const formatter = createSearchFormatter('table');
+      formatter.format(createOptions({ matches: [matchWithNewline], totalCount: 1 }));
+
+      const matchLine = mockConsole.mock.calls
+        .map((call) => call[0] as string)
+        .find((line) => line.includes('john.doe'));
+      expect(matchLine).toBeDefined();
+      expect(matchLine).not.toContain('\n');
+    });
+  });
 });
