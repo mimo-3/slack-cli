@@ -36,9 +36,7 @@ describe('wrapCommand', () => {
   });
 
   it('should strip ANSI escape sequences from error messages', async () => {
-    const action = vi
-      .fn()
-      .mockRejectedValue(new Error('bad_request [2J[1;1Hinjected'));
+    const action = vi.fn().mockRejectedValue(new Error('bad_request [2J[1;1Hinjected'));
 
     await wrapCommand(action)({});
 
@@ -49,9 +47,7 @@ describe('wrapCommand', () => {
   });
 
   it('should strip OSC sequences from error messages', async () => {
-    const action = vi
-      .fn()
-      .mockRejectedValue(new Error('failed ]0;evil titlerest'));
+    const action = vi.fn().mockRejectedValue(new Error('failed ]0;evil titlerest'));
 
     await wrapCommand(action)({});
 
