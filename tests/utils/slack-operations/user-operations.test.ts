@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { RATE_LIMIT } from '../../../src/utils/constants';
 import { UserOperations } from '../../../src/utils/slack-operations/user-operations';
 
 vi.mock('@slack/web-api', () => ({
@@ -198,7 +199,8 @@ describe('UserOperations', () => {
       await Promise.all(userIds.map((userId) => userOps.getUserInfo(userId)));
 
       expect(mockClient.users.info).toHaveBeenCalledTimes(10);
-      expect(maxInFlight).toBeLessThanOrEqual(3);
+      expect(maxInFlight).toBeGreaterThan(1);
+      expect(maxInFlight).toBeLessThanOrEqual(RATE_LIMIT.CONCURRENT_REQUESTS);
     });
   });
 
