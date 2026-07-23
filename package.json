@@ -1,6 +1,6 @@
 {
   "name": "@mimo-3/slack-cli",
-  "version": "0.24.0",
+  "version": "0.24.1",
   "description": "A command-line tool for sending messages to Slack",
   "main": "dist/index.js",
   "bin": {
