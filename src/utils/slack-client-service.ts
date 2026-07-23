@@ -224,7 +224,7 @@ export class SlackApiClient {
   }
 
   async listUsergroupMembers(usergroupId: string): Promise<string[]> {
-    return this.usergroupOps.listUsergroupUsers(usergroupId);
+    return this.usergroupOps.listUsergroupMembers(usergroupId);
   }
 
   async resolveUsergroupIdByHandle(handle: string): Promise<string> {
