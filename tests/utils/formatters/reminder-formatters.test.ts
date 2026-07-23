@@ -119,4 +119,36 @@ describe('reminder formatters', () => {
       expect(logSpy).toHaveBeenCalled();
     });
   });
+
+  describe('single-line output hardening', () => {
+    const remindersWithNewline = [
+      {
+        id: 'Rm01',
+        text: 'first line\nfake-row',
+        time: 1709290800,
+        complete_ts: 0,
+        recurring: false,
+      },
+    ];
+
+    it('should collapse newlines in simple format text', () => {
+      const formatter = createReminderFormatter('simple');
+      formatter.format({ reminders: remindersWithNewline });
+
+      const output = logSpy.mock.calls[0][0] as string;
+      expect(output).not.toContain('\n');
+      expect(output).toContain('first line fake-row');
+    });
+
+    it('should collapse newlines in table format text', () => {
+      const formatter = createReminderFormatter('table');
+      formatter.format({ reminders: remindersWithNewline });
+
+      const dataRow = logSpy.mock.calls
+        .map((call) => call[0] as string)
+        .find((line) => line.includes('Rm01'));
+      expect(dataRow).toBeDefined();
+      expect(dataRow).not.toContain('\n');
+    });
+  });
 });

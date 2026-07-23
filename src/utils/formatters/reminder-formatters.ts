@@ -1,4 +1,4 @@
-import { sanitizeTerminalText } from '../terminal-sanitizer';
+import { sanitizeSingleLineText } from '../terminal-sanitizer';
 import { AbstractFormatter, createFormatterFactory, JsonFormatter } from './base-formatter';
 
 export interface ReminderInfo {
@@ -37,8 +37,8 @@ class ReminderTableFormatter extends AbstractFormatter<ReminderFormatterOptions>
     console.log('\u2500'.repeat(idWidth + textWidth + timeWidth + statusWidth));
 
     reminders.forEach((reminder) => {
-      const id = sanitizeTerminalText(reminder.id || '').padEnd(idWidth);
-      const text = sanitizeTerminalText(reminder.text || '')
+      const id = sanitizeSingleLineText(reminder.id || '').padEnd(idWidth);
+      const text = sanitizeSingleLineText(reminder.text || '')
         .slice(0, textWidth - 2)
         .padEnd(textWidth);
       const time = formatTime(reminder.time).padEnd(timeWidth);
@@ -55,7 +55,7 @@ class ReminderSimpleFormatter extends AbstractFormatter<ReminderFormatterOptions
       const time = formatTime(reminder.time);
       const status = getStatus(reminder.complete_ts);
       console.log(
-        `${sanitizeTerminalText(reminder.id || '')}\t${sanitizeTerminalText(reminder.text || '')}\t${time}\t${status}`
+        `${sanitizeSingleLineText(reminder.id || '')}\t${sanitizeSingleLineText(reminder.text || '')}\t${time}\t${status}`
       );
     });
   }
