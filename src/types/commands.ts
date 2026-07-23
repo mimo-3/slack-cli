@@ -142,6 +142,19 @@ export interface UsersPresenceOptions {
   profile?: string;
 }
 
+export interface UsergroupsListOptions {
+  includeDisabled?: boolean;
+  format?: 'table' | 'simple' | 'json';
+  profile?: string;
+}
+
+export interface UsergroupsMembersOptions {
+  id?: string;
+  handle?: string;
+  format?: 'table' | 'simple' | 'json';
+  profile?: string;
+}
+
 export interface ChannelInfoOptions {
   channel: string;
   format?: 'table' | 'simple' | 'json';

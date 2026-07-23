@@ -402,6 +402,29 @@ slack-cli users presence --name @alice --format json
 slack-cli users list --profile work
 ```
 
+### User Groups
+
+```bash
+# List user groups in the workspace
+slack-cli usergroups list
+
+# Include disabled user groups
+slack-cli usergroups list --include-disabled
+
+# Output in different formats
+slack-cli usergroups list --format json
+slack-cli usergroups list --format simple
+
+# List members of a user group by ID
+slack-cli usergroups members --id S01ABCDEF
+
+# List members of a user group by handle
+slack-cli usergroups members --handle @engineers
+
+# Use specific profile
+slack-cli usergroups list --profile work
+```
+
 ### Scheduled Messages
 
 ```bash
@@ -639,6 +662,25 @@ Subcommands: `list`, `info`, `lookup`
 | --email  |       | Email address to look up (required)                 |
 | --format |       | Output format: table, simple, json (default: table) |
 
+### usergroups command
+
+Subcommands: `list`, `members`
+
+#### usergroups list
+
+| Option             | Short | Description                                         |
+| ------------------ | ----- | --------------------------------------------------- |
+| --include-disabled |       | Include disabled user groups                        |
+| --format           |       | Output format: table, simple, json (default: table) |
+
+#### usergroups members
+
+| Option   | Short | Description                                          |
+| -------- | ----- | ---------------------------------------------------- |
+| --id     |       | User group ID (either --id or --handle is required)  |
+| --handle |       | User group handle (e.g. @engineers)                  |
+| --format |       | Output format: table, simple, json (default: table)  |
+
 ### scheduled command
 
 Subcommands: `list`, `cancel`
@@ -799,6 +841,7 @@ Your Slack API token needs the following scopes:
 - `im:write` - Open DM channels for --user/--email DM sending
 - `users:read` - Access user information for unread counts and user listing
 - `users:read.email` - Look up users by email address
+- `usergroups:read` - List user groups and their members
 - `search:read` - Search messages (user token only, not supported with bot tokens)
 - `reactions:write` - Add and remove reactions
 - `pins:read` - List pinned items in a channel

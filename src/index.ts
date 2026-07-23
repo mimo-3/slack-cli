@@ -25,6 +25,7 @@ import { setupSendCommand } from './commands/send';
 import { setupSendEphemeralCommand } from './commands/send-ephemeral';
 import { setupUnreadCommand } from './commands/unread';
 import { setupUploadCommand } from './commands/upload';
+import { setupUsergroupsCommand } from './commands/usergroups';
 import { setupUsersCommand } from './commands/users';
 import { checkForUpdates } from './utils/update-notifier';
 
@@ -62,6 +63,7 @@ export function createProgram(): Command {
   program.addCommand(setupReactionCommand());
   program.addCommand(setupPinCommand());
   program.addCommand(setupUsersCommand());
+  program.addCommand(setupUsergroupsCommand());
   program.addCommand(setupChannelCommand());
   program.addCommand(setupMembersCommand());
   program.addCommand(setupSendEphemeralCommand());
