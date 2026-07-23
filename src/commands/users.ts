@@ -65,15 +65,15 @@ function renderUserInfo(user: SlackUser) {
 function renderPresenceTable(userId: string, presence: UserPresence) {
   const rows = [
     {
-      user: sanitizeTerminalText(userId),
-      presence: sanitizeTerminalText(presence.presence),
+      user: sanitizeSingleLineText(userId),
+      presence: sanitizeSingleLineText(presence.presence),
     },
   ];
   console.table(sanitizeTerminalData(rows));
 }
 
 function renderPresenceSimple(userId: string, presence: UserPresence) {
-  console.log(`${sanitizeTerminalText(userId)}\t${sanitizeTerminalText(presence.presence)}`);
+  console.log(`${sanitizeSingleLineText(userId)}\t${sanitizeSingleLineText(presence.presence)}`);
 }
 
 export function setupUsersCommand(): Command {

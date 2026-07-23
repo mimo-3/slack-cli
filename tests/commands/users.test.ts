@@ -399,6 +399,31 @@ describe('users command', () => {
       expect(mockConsole.logSpy).toHaveBeenCalledWith(expect.stringContaining('active'));
     });
 
+    it('should collapse newlines in simple presence output', async () => {
+      vi.mocked(mockConfigManager.getConfig).mockResolvedValue({
+        token: 'test-token',
+        updatedAt: new Date().toISOString(),
+      });
+      vi.mocked(mockSlackClient.getUserPresence).mockResolvedValue({
+        presence: 'active\nfake-row',
+      });
+
+      await program.parseAsync([
+        'node',
+        'slack-cli',
+        'users',
+        'presence',
+        '--id',
+        'U123',
+        '--format',
+        'simple',
+      ]);
+
+      const output = mockConsole.logSpy.mock.calls[0][0] as string;
+      expect(output).not.toContain('\n');
+      expect(output).toContain('active fake-row');
+    });
+
     it('should display away presence in table format', async () => {
       vi.mocked(mockConfigManager.getConfig).mockResolvedValue({
         token: 'test-token',
