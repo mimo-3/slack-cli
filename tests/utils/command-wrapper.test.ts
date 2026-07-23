@@ -6,7 +6,7 @@ describe('wrapCommand', () => {
   let exitSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
   });
 
