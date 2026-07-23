@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { sanitizeTerminalData, sanitizeTerminalText } from '../../src/utils/terminal-sanitizer';
+import {
+  sanitizeSingleLineText,
+  sanitizeTerminalData,
+  sanitizeTerminalText,
+} from '../../src/utils/terminal-sanitizer';
 
 describe('terminal-sanitizer', () => {
   it('removes ANSI escape sequences and control characters', () => {
@@ -30,5 +34,23 @@ describe('terminal-sanitizer', () => {
     const date = new Date('2026-03-06T00:00:00.000Z');
 
     expect(sanitizeTerminalData({ createdAt: date })).toEqual({ createdAt: date });
+  });
+
+  describe('sanitizeSingleLineText', () => {
+    it('collapses newlines and tabs into single spaces', () => {
+      expect(sanitizeSingleLineText('a\nb\tc')).toBe('a b c');
+    });
+
+    it('collapses whitespace runs and trims the result', () => {
+      expect(sanitizeSingleLineText(' a \r\n\t b ')).toBe('a b');
+    });
+
+    it('removes ANSI escape sequences before collapsing', () => {
+      expect(sanitizeSingleLineText('[31mred[0m\nnext')).toBe('red next');
+    });
+
+    it('returns empty string for empty input', () => {
+      expect(sanitizeSingleLineText('')).toBe('');
+    });
   });
 });

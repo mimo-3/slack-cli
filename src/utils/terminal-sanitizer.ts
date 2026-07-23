@@ -32,6 +32,15 @@ export function sanitizeTerminalText(value: string): string {
   return sanitized;
 }
 
+/**
+ * Sanitize a value for single-line output (TSV rows, table cells).
+ * Collapses whitespace runs (including newlines and tabs) into single spaces
+ * so untrusted values cannot forge extra rows or columns.
+ */
+export function sanitizeSingleLineText(value: string): string {
+  return sanitizeTerminalText(value).replace(/\s+/g, ' ').trim();
+}
+
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   if (!value || typeof value !== 'object') {
     return false;
