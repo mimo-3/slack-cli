@@ -22,6 +22,7 @@ import type {
   SearchMessagesOptions,
   SearchResult,
   SlackUser,
+  SlackUsergroup,
   StarListResult,
   UserPresence,
 } from '../types/slack';
@@ -37,6 +38,7 @@ import { ReminderOperations } from './slack-operations/reminder-operations';
 import { SearchOperations } from './slack-operations/search-operations';
 import { StarOperations } from './slack-operations/star-operations';
 import { UserOperations } from './slack-operations/user-operations';
+import { UsergroupOperations } from './slack-operations/usergroup-operations';
 
 export class SlackApiClient {
   private channelOps: ChannelOperations;
@@ -45,6 +47,7 @@ export class SlackApiClient {
   private reactionOps: ReactionOperations;
   private pinOps: PinOperations;
   private userOps: UserOperations;
+  private usergroupOps: UsergroupOperations;
   private searchOps: SearchOperations;
   private reminderOps: ReminderOperations;
   private starOps: StarOperations;
@@ -58,6 +61,7 @@ export class SlackApiClient {
     this.reactionOps = new ReactionOperations(sharedContext, this.channelOps);
     this.pinOps = new PinOperations(sharedContext, this.channelOps);
     this.userOps = new UserOperations(sharedContext);
+    this.usergroupOps = new UsergroupOperations(sharedContext);
     this.searchOps = new SearchOperations(sharedContext);
     this.reminderOps = new ReminderOperations(sharedContext);
     this.starOps = new StarOperations(sharedContext);
@@ -213,6 +217,18 @@ export class SlackApiClient {
 
   async resolveUserIdByName(username: string): Promise<string> {
     return this.userOps.resolveUserIdByName(username);
+  }
+
+  async listUsergroups(includeDisabled?: boolean): Promise<SlackUsergroup[]> {
+    return this.usergroupOps.listUsergroups(includeDisabled);
+  }
+
+  async listUsergroupMembers(usergroupId: string): Promise<string[]> {
+    return this.usergroupOps.listUsergroupUsers(usergroupId);
+  }
+
+  async resolveUsergroupIdByHandle(handle: string): Promise<string> {
+    return this.usergroupOps.resolveUsergroupIdByHandle(handle);
   }
 
   async searchMessages(query: string, options?: SearchMessagesOptions): Promise<SearchResult> {
