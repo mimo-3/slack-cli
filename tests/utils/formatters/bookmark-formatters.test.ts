@@ -118,4 +118,37 @@ describe('bookmark formatters', () => {
       expect(logSpy).toHaveBeenCalled();
     });
   });
+
+  describe('single-line output hardening', () => {
+    const itemsWithNewline: BookmarkFormatterOptions = {
+      items: [
+        {
+          type: 'message',
+          channel: 'C123',
+          message: { text: 'first line\nfake-row', ts: '1234567890.123456' },
+          date_create: 1709290800,
+        },
+      ],
+    };
+
+    it('should collapse newlines in simple format text', () => {
+      const formatter = createBookmarkFormatter('simple');
+      formatter.format(itemsWithNewline);
+
+      const output = logSpy.mock.calls[0][0] as string;
+      expect(output).not.toContain('\n');
+      expect(output).toContain('first line fake-row');
+    });
+
+    it('should collapse newlines in table format text', () => {
+      const formatter = createBookmarkFormatter('table');
+      formatter.format(itemsWithNewline);
+
+      const dataRow = logSpy.mock.calls
+        .map((call) => call[0] as string)
+        .find((line) => line.includes('C123'));
+      expect(dataRow).toBeDefined();
+      expect(dataRow).not.toContain('\n');
+    });
+  });
 });
