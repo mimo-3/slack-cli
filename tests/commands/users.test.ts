@@ -102,6 +102,30 @@ describe('users command', () => {
       expect(mockConsole.logSpy).toHaveBeenCalledWith(expect.stringContaining('alice'));
     });
 
+    it('should collapse newlines in simple format fields', async () => {
+      vi.mocked(mockConfigManager.getConfig).mockResolvedValue({
+        token: 'test-token',
+        updatedAt: new Date().toISOString(),
+      });
+      vi.mocked(mockSlackClient.listUsers).mockResolvedValue([
+        {
+          id: 'U123',
+          name: 'alice\nfake-row',
+          real_name: 'Alice\tSmith',
+          profile: { email: 'alice@example.com', display_name: 'alice' },
+          is_bot: false,
+          deleted: false,
+        },
+      ]);
+
+      await program.parseAsync(['node', 'slack-cli', 'users', 'list', '--format', 'simple']);
+
+      const output = mockConsole.logSpy.mock.calls[0][0] as string;
+      expect(output).not.toContain('\n');
+      expect(output).toContain('alice fake-row');
+      expect(output).toContain('Alice Smith');
+    });
+
     it('should show message when no users found', async () => {
       vi.mocked(mockConfigManager.getConfig).mockResolvedValue({
         token: 'test-token',
@@ -373,6 +397,31 @@ describe('users command', () => {
       ]);
 
       expect(mockConsole.logSpy).toHaveBeenCalledWith(expect.stringContaining('active'));
+    });
+
+    it('should collapse newlines in simple presence output', async () => {
+      vi.mocked(mockConfigManager.getConfig).mockResolvedValue({
+        token: 'test-token',
+        updatedAt: new Date().toISOString(),
+      });
+      vi.mocked(mockSlackClient.getUserPresence).mockResolvedValue({
+        presence: 'active\nfake-row',
+      });
+
+      await program.parseAsync([
+        'node',
+        'slack-cli',
+        'users',
+        'presence',
+        '--id',
+        'U123',
+        '--format',
+        'simple',
+      ]);
+
+      const output = mockConsole.logSpy.mock.calls[0][0] as string;
+      expect(output).not.toContain('\n');
+      expect(output).toContain('active fake-row');
     });
 
     it('should display away presence in table format', async () => {

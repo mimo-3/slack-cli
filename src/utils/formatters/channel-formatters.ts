@@ -2,7 +2,12 @@ import chalk from 'chalk';
 import { Channel } from '../../types/slack';
 import { formatChannelName } from '../channel-formatter';
 import { formatSlackTimestamp } from '../date-utils';
+import { sanitizeSingleLineText } from '../terminal-sanitizer';
 import { AbstractFormatter, createFormatterFactory, JsonFormatter } from './base-formatter';
+
+function singleLineChannelName(channel: Channel): string {
+  return sanitizeSingleLineText(channel.display_name || formatChannelName(channel.name));
+}
 
 export interface ChannelFormatterOptions {
   channels: Channel[];
@@ -15,8 +20,7 @@ class ChannelTableFormatter extends AbstractFormatter<ChannelFormatterOptions> {
     console.log('─'.repeat(50));
 
     channels.forEach((channel) => {
-      const channelName = channel.display_name || formatChannelName(channel.name);
-      const paddedName = channelName.padEnd(16);
+      const paddedName = singleLineChannelName(channel).padEnd(16);
       const count = (channel.unread_count || 0).toString().padEnd(6);
       const lastRead = channel.last_read ? formatSlackTimestamp(channel.last_read) : 'Unknown';
       console.log(`${paddedName} ${count}  ${lastRead}`);
@@ -27,8 +31,7 @@ class ChannelTableFormatter extends AbstractFormatter<ChannelFormatterOptions> {
 class ChannelSimpleFormatter extends AbstractFormatter<ChannelFormatterOptions> {
   format({ channels }: ChannelFormatterOptions): void {
     channels.forEach((channel) => {
-      const channelName = channel.display_name || formatChannelName(channel.name);
-      console.log(`${channelName} (${channel.unread_count || 0})`);
+      console.log(`${singleLineChannelName(channel)} (${channel.unread_count || 0})`);
     });
   }
 }
@@ -49,8 +52,7 @@ class ChannelCountFormatter extends AbstractFormatter<ChannelFormatterOptions> {
     channels.forEach((channel) => {
       const count = channel.unread_count || 0;
       totalUnread += count;
-      const channelName = channel.display_name || formatChannelName(channel.name);
-      console.log(`${channelName}: ${count}`);
+      console.log(`${singleLineChannelName(channel)}: ${count}`);
     });
     console.log(chalk.bold(`Total: ${totalUnread} unread messages`));
   }

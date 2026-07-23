@@ -9,7 +9,11 @@ import { SlackUser, UserPresence } from '../types/slack';
 import { renderByFormat, withSlackClient } from '../utils/command-support';
 import { wrapCommand } from '../utils/command-wrapper';
 import { parseLimit } from '../utils/option-parsers';
-import { sanitizeTerminalData, sanitizeTerminalText } from '../utils/terminal-sanitizer';
+import {
+  sanitizeSingleLineText,
+  sanitizeTerminalData,
+  sanitizeTerminalText,
+} from '../utils/terminal-sanitizer';
 import { createValidationHook, optionValidators } from '../utils/validators';
 
 function renderUserTable(users: SlackUser[]) {
@@ -27,11 +31,11 @@ function renderUserTable(users: SlackUser[]) {
 
 function renderUserSimple(users: SlackUser[]) {
   for (const user of users) {
-    const email = user.profile?.email ? ` <${sanitizeTerminalText(user.profile.email)}>` : '';
+    const email = user.profile?.email ? ` <${sanitizeSingleLineText(user.profile.email)}>` : '';
     console.log(
-      `${sanitizeTerminalText(user.id || '')}\t${sanitizeTerminalText(
+      `${sanitizeSingleLineText(user.id || '')}\t${sanitizeSingleLineText(
         user.name || ''
-      )}\t${sanitizeTerminalText(user.real_name || '')}${email}`
+      )}\t${sanitizeSingleLineText(user.real_name || '')}${email}`
     );
   }
 }
@@ -61,15 +65,15 @@ function renderUserInfo(user: SlackUser) {
 function renderPresenceTable(userId: string, presence: UserPresence) {
   const rows = [
     {
-      user: sanitizeTerminalText(userId),
-      presence: sanitizeTerminalText(presence.presence),
+      user: sanitizeSingleLineText(userId),
+      presence: sanitizeSingleLineText(presence.presence),
     },
   ];
   console.table(sanitizeTerminalData(rows));
 }
 
 function renderPresenceSimple(userId: string, presence: UserPresence) {
-  console.log(`${sanitizeTerminalText(userId)}\t${sanitizeTerminalText(presence.presence)}`);
+  console.log(`${sanitizeSingleLineText(userId)}\t${sanitizeSingleLineText(presence.presence)}`);
 }
 
 export function setupUsersCommand(): Command {

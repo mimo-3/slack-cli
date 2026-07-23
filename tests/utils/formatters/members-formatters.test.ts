@@ -88,6 +88,34 @@ describe('members formatters', () => {
     });
   });
 
+  describe('single-line output hardening', () => {
+    it('should collapse newlines and tabs in simple format fields', () => {
+      const formatter = createMembersFormatter('simple');
+      formatter.format({
+        members: [{ id: 'U01', name: 'alice\nfake-row', realName: 'Alice\tSmith' }],
+      });
+
+      const output = logSpy.mock.calls[0][0] as string;
+      expect(output).not.toContain('\n');
+      expect(output).toContain('alice fake-row');
+      expect(output).toContain('Alice Smith');
+    });
+
+    it('should collapse newlines in table format fields', () => {
+      const formatter = createMembersFormatter('table');
+      formatter.format({
+        members: [{ id: 'U01', name: 'alice\nfake-row', realName: 'Alice Smith' }],
+      });
+
+      const dataRow = logSpy.mock.calls
+        .map((call) => call[0] as string)
+        .find((line) => line.includes('U01'));
+      expect(dataRow).toBeDefined();
+      expect(dataRow).not.toContain('\n');
+      expect(dataRow).toContain('alice fake-row');
+    });
+  });
+
   describe('factory', () => {
     it('should default to table format for unknown format', () => {
       const formatter = createMembersFormatter('unknown');

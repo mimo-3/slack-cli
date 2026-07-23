@@ -1,4 +1,4 @@
-import { sanitizeTerminalText } from '../terminal-sanitizer';
+import { sanitizeSingleLineText } from '../terminal-sanitizer';
 import { AbstractFormatter, createFormatterFactory, JsonFormatter } from './base-formatter';
 
 export interface BookmarkItem {
@@ -35,9 +35,9 @@ class BookmarkTableFormatter extends AbstractFormatter<BookmarkFormatterOptions>
     console.log('\u2500'.repeat(channelWidth + tsWidth + textWidth + savedAtWidth));
 
     items.forEach((item) => {
-      const channel = sanitizeTerminalText(item.channel || '').padEnd(channelWidth);
-      const ts = sanitizeTerminalText(item.message?.ts || '').padEnd(tsWidth);
-      const text = sanitizeTerminalText(item.message?.text || '')
+      const channel = sanitizeSingleLineText(item.channel || '').padEnd(channelWidth);
+      const ts = sanitizeSingleLineText(item.message?.ts || '').padEnd(tsWidth);
+      const text = sanitizeSingleLineText(item.message?.text || '')
         .slice(0, textWidth - 2)
         .padEnd(textWidth);
       const savedAt = formatDate(item.date_create).padEnd(savedAtWidth);
@@ -52,7 +52,7 @@ class BookmarkSimpleFormatter extends AbstractFormatter<BookmarkFormatterOptions
     items.forEach((item) => {
       const savedAt = formatDate(item.date_create);
       console.log(
-        `${sanitizeTerminalText(item.channel || '')}\t${sanitizeTerminalText(item.message?.ts || '')}\t${sanitizeTerminalText(item.message?.text || '')}\t${savedAt}`
+        `${sanitizeSingleLineText(item.channel || '')}\t${sanitizeSingleLineText(item.message?.ts || '')}\t${sanitizeSingleLineText(item.message?.text || '')}\t${savedAt}`
       );
     });
   }
