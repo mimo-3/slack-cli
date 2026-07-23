@@ -90,6 +90,18 @@ export interface UserPresence {
   presence: string;
 }
 
+export interface SlackUsergroup {
+  id?: string;
+  team_id?: string;
+  name?: string;
+  handle?: string;
+  description?: string;
+  is_external?: boolean;
+  date_create?: number;
+  date_delete?: number;
+  user_count?: number;
+}
+
 export interface SlackUser {
   id?: string;
   name?: string;
