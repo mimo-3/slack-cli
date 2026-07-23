@@ -16,7 +16,7 @@ export class UsergroupOperations extends BaseSlackClient {
     return (response.usergroups || []) as SlackUsergroup[];
   }
 
-  async listUsergroupUsers(usergroupId: string): Promise<string[]> {
+  async listUsergroupMembers(usergroupId: string): Promise<string[]> {
     const response = await this.client.usergroups.users.list({
       usergroup: usergroupId,
     });

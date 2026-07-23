@@ -113,14 +113,14 @@ describe('UsergroupOperations', () => {
     });
   });
 
-  describe('listUsergroupUsers', () => {
+  describe('listUsergroupMembers', () => {
     it('should list user IDs in a usergroup', async () => {
       mockClient.usergroups.users.list.mockResolvedValue({
         ok: true,
         users: ['U123', 'U456'],
       });
 
-      const result = await usergroupOps.listUsergroupUsers('S123');
+      const result = await usergroupOps.listUsergroupMembers('S123');
 
       expect(mockClient.usergroups.users.list).toHaveBeenCalledWith({
         usergroup: 'S123',
@@ -134,7 +134,7 @@ describe('UsergroupOperations', () => {
         users: [],
       });
 
-      const result = await usergroupOps.listUsergroupUsers('S123');
+      const result = await usergroupOps.listUsergroupMembers('S123');
 
       expect(result).toEqual([]);
     });
@@ -142,7 +142,9 @@ describe('UsergroupOperations', () => {
     it('should throw when usergroup not found', async () => {
       mockClient.usergroups.users.list.mockRejectedValue(new Error('no_such_subteam'));
 
-      await expect(usergroupOps.listUsergroupUsers('SINVALID')).rejects.toThrow('no_such_subteam');
+      await expect(usergroupOps.listUsergroupMembers('SINVALID')).rejects.toThrow(
+        'no_such_subteam'
+      );
     });
   });
 
