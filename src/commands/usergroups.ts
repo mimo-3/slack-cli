@@ -3,14 +3,10 @@ import { UsergroupsListOptions, UsergroupsMembersOptions } from '../types/comman
 import { SlackUsergroup } from '../types/slack';
 import { renderByFormat, withSlackClient } from '../utils/command-support';
 import { wrapCommand } from '../utils/command-wrapper';
+import { createMembersFormatter, MemberInfo } from '../utils/formatters/members-formatters';
+import { parseFormat } from '../utils/option-parsers';
 import { sanitizeTerminalData, sanitizeTerminalText } from '../utils/terminal-sanitizer';
 import { createValidationHook, optionValidators } from '../utils/validators';
-
-interface UsergroupMemberInfo {
-  id: string;
-  name?: string;
-  real_name?: string;
-}
 
 function renderUsergroupTable(usergroups: SlackUsergroup[]) {
   const rows = usergroups.map((usergroup) => ({
@@ -30,26 +26,6 @@ function renderUsergroupSimple(usergroups: SlackUsergroup[]) {
       `${sanitizeTerminalText(usergroup.id || '')}\t@${sanitizeTerminalText(
         usergroup.handle || ''
       )}\t${sanitizeTerminalText(usergroup.name || '')}`
-    );
-  }
-}
-
-function renderMemberTable(members: UsergroupMemberInfo[]) {
-  const rows = members.map((member) => ({
-    id: sanitizeTerminalText(member.id),
-    name: sanitizeTerminalText(member.name || ''),
-    real_name: sanitizeTerminalText(member.real_name || ''),
-  }));
-
-  console.table(sanitizeTerminalData(rows));
-}
-
-function renderMemberSimple(members: UsergroupMemberInfo[]) {
-  for (const member of members) {
-    console.log(
-      `${sanitizeTerminalText(member.id)}\t${sanitizeTerminalText(
-        member.name || ''
-      )}\t${sanitizeTerminalText(member.real_name || '')}`
     );
   }
 }
@@ -114,14 +90,14 @@ export function setupUsergroupsCommand(): Command {
             return;
           }
 
-          const members: UsergroupMemberInfo[] = await Promise.all(
+          const members: MemberInfo[] = await Promise.all(
             memberIds.map(async (userId) => {
               try {
                 const user = await client.getUserInfo(userId);
                 return {
                   id: userId,
                   name: user.name,
-                  real_name: user.real_name,
+                  realName: user.real_name,
                 };
               } catch {
                 return { id: userId };
@@ -129,10 +105,8 @@ export function setupUsergroupsCommand(): Command {
             })
           );
 
-          renderByFormat(options, members, {
-            table: renderMemberTable,
-            simple: renderMemberSimple,
-          });
+          const format = parseFormat(options.format);
+          createMembersFormatter(format).format({ members });
         });
       })
     );
