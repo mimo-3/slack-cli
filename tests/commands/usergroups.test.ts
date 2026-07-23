@@ -111,6 +111,29 @@ describe('usergroups command', () => {
       expect(mockConsole.logSpy).toHaveBeenCalledWith(expect.stringContaining('engineers'));
     });
 
+    it('should collapse newlines in simple format fields', async () => {
+      vi.mocked(mockConfigManager.getConfig).mockResolvedValue({
+        token: 'test-token',
+        updatedAt: new Date().toISOString(),
+      });
+      vi.mocked(mockSlackClient.listUsergroups).mockResolvedValue([
+        {
+          id: 'S123',
+          name: 'Engineering\nfake-row',
+          handle: 'eng\tineers',
+          description: 'team',
+          user_count: 10,
+        },
+      ]);
+
+      await program.parseAsync(['node', 'slack-cli', 'usergroups', 'list', '--format', 'simple']);
+
+      const output = mockConsole.logSpy.mock.calls[0][0] as string;
+      expect(output).not.toContain('\n');
+      expect(output).toContain('Engineering fake-row');
+      expect(output).toContain('eng ineers');
+    });
+
     it('should show message when no usergroups found', async () => {
       vi.mocked(mockConfigManager.getConfig).mockResolvedValue({
         token: 'test-token',

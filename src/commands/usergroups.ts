@@ -5,15 +5,15 @@ import { renderByFormat, withSlackClient } from '../utils/command-support';
 import { wrapCommand } from '../utils/command-wrapper';
 import { createMembersFormatter, MemberInfo } from '../utils/formatters/members-formatters';
 import { parseFormat } from '../utils/option-parsers';
-import { sanitizeTerminalData, sanitizeTerminalText } from '../utils/terminal-sanitizer';
+import { sanitizeSingleLineText, sanitizeTerminalData } from '../utils/terminal-sanitizer';
 import { createValidationHook, optionValidators } from '../utils/validators';
 
 function renderUsergroupTable(usergroups: SlackUsergroup[]) {
   const rows = usergroups.map((usergroup) => ({
-    id: sanitizeTerminalText(usergroup.id || ''),
-    handle: sanitizeTerminalText(usergroup.handle || ''),
-    name: sanitizeTerminalText(usergroup.name || ''),
-    description: sanitizeTerminalText(usergroup.description || ''),
+    id: sanitizeSingleLineText(usergroup.id || ''),
+    handle: sanitizeSingleLineText(usergroup.handle || ''),
+    name: sanitizeSingleLineText(usergroup.name || ''),
+    description: sanitizeSingleLineText(usergroup.description || ''),
     user_count: usergroup.user_count ?? '',
   }));
 
@@ -23,9 +23,9 @@ function renderUsergroupTable(usergroups: SlackUsergroup[]) {
 function renderUsergroupSimple(usergroups: SlackUsergroup[]) {
   for (const usergroup of usergroups) {
     console.log(
-      `${sanitizeTerminalText(usergroup.id || '')}\t@${sanitizeTerminalText(
+      `${sanitizeSingleLineText(usergroup.id || '')}\t@${sanitizeSingleLineText(
         usergroup.handle || ''
-      )}\t${sanitizeTerminalText(usergroup.name || '')}`
+      )}\t${sanitizeSingleLineText(usergroup.name || '')}`
     );
   }
 }
