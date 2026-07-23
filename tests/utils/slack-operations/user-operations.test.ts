@@ -182,6 +182,24 @@ describe('UserOperations', () => {
 
       await expect(userOps.getUserInfo('UINVALID')).rejects.toThrow('user_not_found');
     });
+
+    it('should limit concurrent users.info calls through the rate limiter', async () => {
+      let inFlight = 0;
+      let maxInFlight = 0;
+      mockClient.users.info.mockImplementation(async ({ user }: { user: string }) => {
+        inFlight++;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        inFlight--;
+        return { ok: true, user: { id: user } };
+      });
+
+      const userIds = Array.from({ length: 10 }, (_, index) => `U${index}`);
+      await Promise.all(userIds.map((userId) => userOps.getUserInfo(userId)));
+
+      expect(mockClient.users.info).toHaveBeenCalledTimes(10);
+      expect(maxInFlight).toBeLessThanOrEqual(3);
+    });
   });
 
   describe('lookupByEmail', () => {

@@ -35,7 +35,7 @@ export class UserOperations extends BaseSlackClient {
   }
 
   async getUserInfo(userId: string): Promise<SlackUser> {
-    const response = await this.client.users.info({ user: userId });
+    const response = await this.rateLimiter(() => this.client.users.info({ user: userId }));
     return response.user as SlackUser;
   }
 
