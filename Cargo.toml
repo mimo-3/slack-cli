@@ -1,0 +1,64 @@
+[package]
+name = "slack-cli"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+description = "A command-line interface for the Slack Web API"
+license = "MIT"
+readme = "README.md"
+keywords = ["slack", "cli", "api", "chat"]
+categories = ["command-line-utilities", "api-bindings"]
+
+[lib]
+name = "slack_cli"
+path = "src/lib.rs"
+
+[[bin]]
+name = "slack-cli"
+path = "src/main.rs"
+
+[dependencies]
+# CLI
+clap = { version = "4", features = ["derive", "env"] }
+dialoguer = "0.11"
+
+# HTTP / async
+reqwest = { version = "0.12", features = [
+    "json",
+    "rustls-tls",
+    "multipart",
+], default-features = false }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync"] }
+url = "2"
+
+# serde。preserve_order は設定ファイルのプロファイル順を保つために必須
+# （clear 時の「残りの先頭を新 default にする」挙動がキー順に依存する）
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+# serde_yaml はメンテ終了済みのため後継の serde_yaml_ng を使う
+serde_yaml_ng = "0.10"
+csv = "1"
+indexmap = { version = "2", features = ["serde"] }
+
+# 暗号（TypeScript 版 config.json との互換のためのトークン暗号化）
+aes = "0.8"
+aes-gcm = "0.10"
+cbc = { version = "0.1", features = ["alloc"] }
+pbkdf2 = "0.12"
+sha2 = "0.10"
+hmac = "0.12"
+hex = "0.4"
+rand = "0.8"
+
+# 出力・その他
+comfy-table = "7"
+# 表の切り詰めを UTF-16 コードユニットではなく端末の表示幅で行うため（移植方針 C1 / C2）
+unicode-width = "0.2"
+colored = "3"
+chrono = { version = "0.4", features = ["serde"] }
+dirs = "6"
+thiserror = "2"
+
+[dev-dependencies]
+tempfile = "3"
+wiremock = "=0.6.4"

@@ -1,0 +1,18 @@
+# Rust build artifacts
+/target/
+**/*.rs.bk
+
+# バイナリ配布物
+*.pdb
+
+# ローカル設定・秘密（誤コミット防止）
+.env
+.env.*
+*.key
+credentials.json
+
+# エディタ・OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
