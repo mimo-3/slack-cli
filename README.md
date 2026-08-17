@@ -81,7 +81,7 @@ cargo clippy --all-targets -- -D warnings
 - `src/client/` — Slack Web API クライアント。認証・リトライ・ページング
 - `src/config/` — 設定ファイルの読み書きとトークンの暗号化
 - `src/output/` — 出力の書き出し
-- `src/error.rs` — エラーの種類と終了コード（認証切れ 3 / レート制限 4 / その他 1）
+- `src/error.rs` — エラーの種類と終了コード（エラーは一律 1。種別は `code()` で取れる）
 
 コマンドを足す手順は `src/cli/mod.rs` の冒頭コメントにある。
 移植元の仕様は `docs/spec/` に置いてある。
