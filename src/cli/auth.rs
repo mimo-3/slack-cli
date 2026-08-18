@@ -119,7 +119,9 @@ mod tests {
         };
 
         for command in [AuthSubcommand::Test, AuthSubcommand::Whoami] {
-            run(AuthCommand { command }, &client, &global).await.unwrap();
+            run(AuthCommand { command }, &client, &global)
+                .await
+                .unwrap();
         }
         assert_eq!(server.received_requests().await.unwrap().len(), 2);
     }

@@ -294,7 +294,14 @@ mod tests {
 
     #[test]
     fn parses_id_and_output() {
-        let cmd = parse(&["slack-cli", "download", "-i", "F0BFXAEP1UZ", "-o", "out.png"]);
+        let cmd = parse(&[
+            "slack-cli",
+            "download",
+            "-i",
+            "F0BFXAEP1UZ",
+            "-o",
+            "out.png",
+        ]);
         assert_eq!(cmd.id.as_deref(), Some("F0BFXAEP1UZ"));
         assert_eq!(cmd.output.as_deref(), Some("out.png"));
     }
@@ -320,8 +327,8 @@ mod tests {
 
     #[test]
     fn file_names_come_from_the_decoded_url_basename() {
-        let url = Url::parse("https://files.slack.com/files-pri/T1-F1/%E8%B3%87%E6%96%99.pdf")
-            .unwrap();
+        let url =
+            Url::parse("https://files.slack.com/files-pri/T1-F1/%E8%B3%87%E6%96%99.pdf").unwrap();
         assert_eq!(file_name_from_url(&url), "資料.pdf");
 
         let url = Url::parse("https://files.slack.com/files-pri/T1-F1/report.csv?t=xoxe").unwrap();
@@ -499,7 +506,9 @@ mod tests {
         let out = dir.path().join("public.txt");
         let url = Url::parse(&format!("{}/public.txt", elsewhere.uri())).unwrap();
 
-        let size = fetch_to_file(&client_for(&slack), &url, &out).await.unwrap();
+        let size = fetch_to_file(&client_for(&slack), &url, &out)
+            .await
+            .unwrap();
         assert_eq!(size, 6);
 
         let requests = elsewhere.received_requests().await.unwrap();
@@ -519,7 +528,9 @@ mod tests {
         std::fs::write(&out, b"old contents that are longer").unwrap();
 
         let url = Url::parse(&format!("{}/files-pri/T1-F1/report.csv", server.uri())).unwrap();
-        fetch_to_file(&client_for(&server), &url, &out).await.unwrap();
+        fetch_to_file(&client_for(&server), &url, &out)
+            .await
+            .unwrap();
         assert_eq!(std::fs::read(&out).unwrap(), b"new");
     }
 

@@ -6,10 +6,8 @@
 use clap::Args;
 use serde_json::{json, Value};
 
-use crate::cli::send::{
-    finish, post_with_channel_fallback, validate_thread_ts,
-};
 use crate::cli::common::channel_label as format_channel_label;
+use crate::cli::send::{finish, post_with_channel_fallback, validate_thread_ts};
 use crate::cli::GlobalOpts;
 use crate::client::SlackClient;
 use crate::error::SlackCliError;

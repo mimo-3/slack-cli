@@ -179,7 +179,8 @@ fn next_cursor(response: &Value) -> Option<String> {
 
 /// ドット区切りのパスで値を辿る。`"channels"` でも `"messages.matches"` でも引ける。
 fn lookup_path<'a>(value: &'a Value, path: &str) -> Option<&'a Value> {
-    path.split('.').try_fold(value, |current, key| current.get(key))
+    path.split('.')
+        .try_fold(value, |current, key| current.get(key))
 }
 
 #[cfg(test)]
@@ -221,12 +222,20 @@ mod tests {
             .await;
 
         let results = client_for(&server)
-            .paginate_get("conversations.list", &[], "channels", &PaginationOpts::all())
+            .paginate_get(
+                "conversations.list",
+                &[],
+                "channels",
+                &PaginationOpts::all(),
+            )
             .await
             .unwrap();
 
         assert_eq!(
-            results.iter().map(|c| c["id"].as_str().unwrap()).collect::<Vec<_>>(),
+            results
+                .iter()
+                .map(|c| c["id"].as_str().unwrap())
+                .collect::<Vec<_>>(),
             vec!["C1", "C2", "C3"]
         );
         assert_eq!(server.received_requests().await.unwrap().len(), 2);
@@ -257,7 +266,12 @@ mod tests {
 
         // 存在しないキーを指定しても落とさず空を返す
         let none = client_for(&server)
-            .paginate_get("conversations.members", &[], "channels", &PaginationOpts::all())
+            .paginate_get(
+                "conversations.members",
+                &[],
+                "channels",
+                &PaginationOpts::all(),
+            )
             .await
             .unwrap();
         assert!(none.is_empty());
@@ -357,7 +371,12 @@ mod tests {
             .await;
 
         let err = client_for(&server)
-            .paginate_get("conversations.list", &[], "channels", &PaginationOpts::all())
+            .paginate_get(
+                "conversations.list",
+                &[],
+                "channels",
+                &PaginationOpts::all(),
+            )
             .await
             .unwrap_err();
         assert!(matches!(err, SlackCliError::Pagination(_)), "{err}");
@@ -414,7 +433,12 @@ mod tests {
             .await;
 
         let results = client_for(&server)
-            .paginate_get("conversations.list", &[], "channels", &PaginationOpts::all())
+            .paginate_get(
+                "conversations.list",
+                &[],
+                "channels",
+                &PaginationOpts::all(),
+            )
             .await
             .unwrap();
         assert_eq!(results.len(), 1);

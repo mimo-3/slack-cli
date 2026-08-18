@@ -126,9 +126,15 @@ mod tests {
 
     #[test]
     fn table_is_wired_into_format_value() {
-        let out = render(&json!([{ "id": "C1", "name": "general" }]), OutputFormat::Table);
+        let out = render(
+            &json!([{ "id": "C1", "name": "general" }]),
+            OutputFormat::Table,
+        );
         assert!(out.contains("general"), "table output was: {out}");
-        assert!(out.contains('┆') || out.contains('|'), "table output was: {out}");
+        assert!(
+            out.contains('┆') || out.contains('|'),
+            "table output was: {out}"
+        );
     }
 
     #[test]

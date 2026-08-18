@@ -185,12 +185,18 @@ mod tests {
             "OSC sequences must be removed"
         );
         assert_eq!(sanitize_terminal_text("\u{1b}[31mred\u{1b}[0m"), "red");
-        assert_eq!(sanitize_terminal_text("\u{1b}]0;unterminated"), "]0;unterminated");
+        assert_eq!(
+            sanitize_terminal_text("\u{1b}]0;unterminated"),
+            "]0;unterminated"
+        );
     }
 
     #[test]
     fn keeps_tab_and_newline_but_drops_other_control_characters() {
-        assert_eq!(sanitize_terminal_text("a\tb\nc\u{0}d\u{7f}e\u{9b}f"), "a\tb\ncdef");
+        assert_eq!(
+            sanitize_terminal_text("a\tb\nc\u{0}d\u{7f}e\u{9b}f"),
+            "a\tb\ncdef"
+        );
     }
 
     #[test]
