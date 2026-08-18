@@ -152,7 +152,9 @@ async fn run_single_channel(
 
     if cmd.mark_read {
         mark_read(client, &channel_id).await?;
-        eprintln!("✓ Marked messages in {display_name} as read");
+        if !client.dry_run {
+            eprintln!("✓ Marked messages in {display_name} as read");
+        }
     }
     Ok(())
 }
@@ -237,7 +239,7 @@ async fn run_all_channels(
         for channel in &channels {
             mark_read(client, &channel.id).await?;
         }
-        if !channels.is_empty() {
+        if !channels.is_empty() && !client.dry_run {
             eprintln!("✓ Marked all messages as read");
         }
     }
