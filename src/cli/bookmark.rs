@@ -5,17 +5,16 @@
 use std::io::Write;
 
 use clap::{Args, Subcommand};
-use colored::Colorize;
 use serde_json::{json, Value};
 
 use crate::cli::canvas::write_empty;
-use crate::cli::common::{is_channel_id, resolve_channel_id};
+use crate::cli::common::{is_channel_id, resolve_channel_id, write_success};
 use crate::cli::{parse_positive_int, GlobalOpts};
 use crate::client::pagination::PaginationOpts;
 use crate::client::SlackClient;
 use crate::error::SlackCliError;
 use crate::output::sanitize::sanitize_terminal_text;
-use crate::output::{self, OutputFormat};
+use crate::output::{self};
 
 /// `bookmark list --limit` の既定値。
 pub const DEFAULT_LIST_LIMIT: &str = "100";
@@ -88,7 +87,7 @@ async fn run_to(
                     sanitize_terminal_text(&args.channel)
                 ),
                 &args,
-                format,
+                global,
                 writer,
             )
         }
@@ -102,7 +101,7 @@ async fn run_to(
                     sanitize_terminal_text(&args.channel)
                 ),
                 &args,
-                format,
+                global,
                 writer,
             )
         }
@@ -162,15 +161,11 @@ async fn call_stars(
 fn write_result(
     message: &str,
     args: &BookmarkTargetArgs,
-    format: OutputFormat,
+    global: &GlobalOpts,
     writer: &mut (dyn Write + Send),
 ) -> Result<(), SlackCliError> {
-    if format == OutputFormat::Table {
-        writeln!(writer, "{}", message.green())?;
-        return Ok(());
-    }
     let value = json!({ "ok": true, "channel": args.channel, "ts": args.ts });
-    output::format_value(&value, format, writer)
+    write_success(writer, global, message, &value)
 }
 
 /// `stars.list` の item を表示用のフラットな形へ畳む。
@@ -216,6 +211,7 @@ fn sanitize_single_line(input: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::output::OutputFormat;
     use clap::error::ErrorKind;
     use clap::Parser;
     use url::Url;
@@ -320,7 +316,10 @@ mod tests {
         .await
         .unwrap();
 
-        assert!(out.contains("✓ Removed saved item 1.1 from C0123456789"), "{out}");
+        assert!(
+            out.contains("✓ Removed saved item 1.1 from C0123456789"),
+            "{out}"
+        );
     }
 
     #[tokio::test]
@@ -347,9 +346,10 @@ mod tests {
             .and(body_json(
                 json!({ "channel": "general", "timestamp": "1.1" }),
             ))
-            .respond_with(ResponseTemplate::new(200).set_body_json(
-                json!({ "ok": false, "error": "channel_not_found" }),
-            ))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_json(json!({ "ok": false, "error": "channel_not_found" })),
+            )
             .expect(1)
             .mount(&server)
             .await;
@@ -387,9 +387,10 @@ mod tests {
     async fn channel_ids_are_never_retried_after_channel_not_found() {
         let server = MockServer::start().await;
         Mock::given(path("/stars.add"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(
-                json!({ "ok": false, "error": "channel_not_found" }),
-            ))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_json(json!({ "ok": false, "error": "channel_not_found" })),
+            )
             .expect(1)
             .mount(&server)
             .await;
@@ -471,9 +472,7 @@ mod tests {
         let client = client_for(&server);
 
         let json_out = execute(
-            BookmarkSubcommand::List {
-                limit: "10".into(),
-            },
+            BookmarkSubcommand::List { limit: "10".into() },
             &client,
             OutputFormat::Json,
         )
@@ -482,9 +481,7 @@ mod tests {
         assert_eq!(serde_json::from_str::<Value>(&json_out).unwrap(), json!([]));
 
         let table_out = execute(
-            BookmarkSubcommand::List {
-                limit: "10".into(),
-            },
+            BookmarkSubcommand::List { limit: "10".into() },
             &client,
             OutputFormat::Table,
         )

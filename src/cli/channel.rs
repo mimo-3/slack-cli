@@ -2,13 +2,11 @@
 //!
 //! チャンネル名の解決・サニタイズ・時刻整形は `cli::channels` の関数を共有する。
 
-use std::io::Write;
-
 use clap::{Args, Subcommand};
 use serde_json::{Map, Value};
 
 use crate::cli::channels::{format_channel_display, format_created_date};
-use crate::cli::common::resolve_channel_id;
+use crate::cli::common::{resolve_channel_id, write_success};
 use crate::cli::GlobalOpts;
 use crate::client::SlackClient;
 use crate::error::SlackCliError;
@@ -62,8 +60,15 @@ pub async fn run(
     match cmd.command {
         ChannelSubcommand::Info { channel } => show_info(client, global, &channel).await,
         ChannelSubcommand::SetTopic { channel, topic } => {
-            update_text(client, global, &channel, "conversations.setTopic", TOPIC_FIELD, &topic)
-                .await
+            update_text(
+                client,
+                global,
+                &channel,
+                "conversations.setTopic",
+                TOPIC_FIELD,
+                &topic,
+            )
+            .await
         }
         ChannelSubcommand::SetPurpose { channel, purpose } => {
             update_text(
@@ -169,23 +174,19 @@ async fn update_text(
     body.insert(field.into(), Value::String(text.to_string()));
     client.post_json(api_method, &Value::Object(body)).await?;
 
-    let format = global.output_format();
     let mut stdout = std::io::stdout();
-
-    if format == OutputFormat::Table {
-        writeln!(
-            stdout,
-            "{}",
-            success_message(field, &format_channel_display(channel_input))
-        )?;
-        return Ok(());
-    }
 
     let mut result = Map::new();
     result.insert("ok".into(), Value::Bool(true));
     result.insert("channel".into(), Value::String(channel_id));
     result.insert(field.into(), Value::String(text.to_string()));
-    output::format_value(&Value::Object(result), format, &mut stdout)
+
+    write_success(
+        &mut stdout,
+        global,
+        &success_message(field, &format_channel_display(channel_input)),
+        &Value::Object(result),
+    )
 }
 
 fn success_message(field: &str, channel_display: &str) -> String {
@@ -237,8 +238,24 @@ mod tests {
     fn parses_every_subcommand() {
         for argv in [
             vec!["slack-cli", "channel", "info", "-c", "general"],
-            vec!["slack-cli", "channel", "set-topic", "-c", "general", "--topic", "t"],
-            vec!["slack-cli", "channel", "set-purpose", "-c", "general", "--purpose", "p"],
+            vec![
+                "slack-cli",
+                "channel",
+                "set-topic",
+                "-c",
+                "general",
+                "--topic",
+                "t",
+            ],
+            vec![
+                "slack-cli",
+                "channel",
+                "set-purpose",
+                "-c",
+                "general",
+                "--purpose",
+                "p",
+            ],
         ] {
             Cli::try_parse_from(&argv).unwrap_or_else(|e| panic!("{argv:?} failed to parse: {e}"));
         }
@@ -349,7 +366,10 @@ mod tests {
         Mock::given(method("GET"))
             .and(path("/conversations.info"))
             .and(wiremock::matchers::query_param("channel", "C0123456789"))
-            .and(wiremock::matchers::query_param("include_num_members", "true"))
+            .and(wiremock::matchers::query_param(
+                "include_num_members",
+                "true",
+            ))
             .respond_with(ResponseTemplate::new(200).set_body_json(json!({
                 "ok": true,
                 "channel": sample_channel(),
@@ -368,7 +388,9 @@ mod tests {
         let server = MockServer::start().await;
         Mock::given(method("POST"))
             .and(path("/conversations.setTopic"))
-            .and(body_json(json!({ "channel": "C0123456789", "topic": "release week" })))
+            .and(body_json(
+                json!({ "channel": "C0123456789", "topic": "release week" }),
+            ))
             .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "ok": true })))
             .expect(1)
             .mount(&server)
