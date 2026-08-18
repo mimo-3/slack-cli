@@ -6,11 +6,11 @@ use clap::Args;
 use serde_json::{json, Value};
 
 use crate::cli::common::resolve_channel_id;
-use crate::output::sanitize::sanitize_single_line_text;
 use crate::cli::{parse_positive_int, GlobalOpts};
 use crate::client::pagination::PaginationOpts;
 use crate::client::SlackClient;
 use crate::error::SlackCliError;
+use crate::output::sanitize::sanitize_single_line_text;
 use crate::output::{self, OutputFormat};
 
 /// `--limit` の既定値。

@@ -34,7 +34,6 @@ pub const ERR_SINCE: &str = "Invalid date format. Use YYYY-MM-DD HH:MM:SS";
 pub const WARN_NUMBER_IGNORED: &str = "Warning: --number is ignored when --thread is specified.";
 pub const WARN_SINCE_IGNORED: &str = "Warning: --since is ignored when --thread is specified.";
 
-
 #[derive(Args, Debug)]
 pub struct HistoryCommand {
     /// Target channel name or ID

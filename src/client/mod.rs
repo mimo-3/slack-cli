@@ -48,8 +48,9 @@ impl SlackClient {
         let token = token.into();
 
         // ヘッダにできない値はここで弾く。ヘッダ組み立て側はユーザー入力を扱わなくて済む。
-        reqwest::header::HeaderValue::from_str(&format!("Bearer {token}"))
-            .map_err(|_| SlackCliError::Configuration("Invalid token: not a valid header value".into()))?;
+        reqwest::header::HeaderValue::from_str(&format!("Bearer {token}")).map_err(|_| {
+            SlackCliError::Configuration("Invalid token: not a valid header value".into())
+        })?;
 
         let base_url = Url::parse(DEFAULT_BASE_URL).expect("default base URL should always parse");
 

@@ -6,15 +6,14 @@
 use std::io::Write;
 
 use clap::{Args, Subcommand};
-use colored::Colorize;
 use serde_json::{json, Value};
 
-use crate::cli::common::resolve_channel_id;
+use crate::cli::common::{report_success, resolve_channel_id};
 use crate::cli::{parse_positive_int, GlobalOpts};
 use crate::client::pagination::PaginationOpts;
 use crate::client::SlackClient;
 use crate::error::SlackCliError;
-use crate::output::sanitize::{sanitize_single_line_text, sanitize_value};
+use crate::output::sanitize::sanitize_value;
 use crate::output::{self, OutputFormat};
 
 /// `scheduled list --limit` の既定値。
@@ -123,9 +122,9 @@ async fn cancel(
         .await?;
 
     report_success(
-        &format!("✓ Scheduled message {id} cancelled"),
-        json!({ "ok": true, "channel": channel_id, "scheduled_message_id": id }),
         global,
+        &format!("✓ Scheduled message {id} cancelled"),
+        &json!({ "ok": true, "channel": channel_id, "scheduled_message_id": id }),
     )
 }
 
@@ -141,20 +140,6 @@ pub(crate) fn write_list(
         return Ok(());
     }
     output::format_value(&Value::Array(items.to_vec()), format, writer)
-}
-
-/// 書き込み系の結果出力。table のときだけ人間向けの 1 行、それ以外はデータを出す。
-pub(crate) fn report_success(
-    message: &str,
-    value: Value,
-    global: &GlobalOpts,
-) -> Result<(), SlackCliError> {
-    let mut stdout = std::io::stdout();
-    if global.output_format() == OutputFormat::Table {
-        writeln!(stdout, "{}", sanitize_single_line_text(message).green())?;
-        return Ok(());
-    }
-    output::format_value(&value, global.output_format(), &mut stdout)
 }
 
 #[cfg(test)]

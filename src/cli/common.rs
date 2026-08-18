@@ -4,14 +4,19 @@
 //! それぞれ写経していた。挙動が少しずつずれる原因になるためここに 1 本化してある。
 //! 端末サニタイズは出力の責務なので `crate::output::sanitize` にある。
 
+use std::io::Write;
+
 use chrono::{DateTime, TimeZone, Utc};
-use serde_json::Value;
+use colored::Colorize;
+use serde_json::{json, Value};
 use unicode_width::UnicodeWidthChar;
 
+use crate::cli::GlobalOpts;
 use crate::client::pagination::PaginationOpts;
 use crate::client::SlackClient;
 use crate::error::SlackCliError;
 use crate::output::sanitize::sanitize_single_line_text;
+use crate::output::{self, OutputFormat};
 
 /// 名前解決に使うチャンネル種別。
 pub const CHANNEL_LOOKUP_TYPES: [&str; 4] = ["public_channel", "private_channel", "im", "mpim"];
@@ -289,8 +294,105 @@ pub fn display_width(value: &str) -> usize {
     value.chars().map(|c| c.width().unwrap_or(0)).sum()
 }
 
+/// 書き込み系コマンドの成功出力。table では緑の 1 行、それ以外はデータを出す。
+///
+/// `--dry-run` のときは書き込みリクエストを送っていないので、成功を名乗ってはいけない。
+/// table では何も出さず（何を送ろうとしたかは stderr の `[dry-run] POST ...` が伝えている）、
+/// 機械可読フォーマットでは送っていないと分かる封筒だけを出す。
+pub(crate) fn write_success(
+    out: &mut dyn Write,
+    global: &GlobalOpts,
+    message: &str,
+    value: &Value,
+) -> Result<(), SlackCliError> {
+    let format = global.output_format();
+
+    if global.dry_run {
+        if format != OutputFormat::Table {
+            output::format_value(&json!({ "ok": true, "dry_run": true }), format, out)?;
+        }
+        return Ok(());
+    }
+
+    if format == OutputFormat::Table {
+        return write_success_line(out, global, message);
+    }
+    output::format_value(value, format, out)
+}
+
+/// フォーマットに関わらず 1 行だけ出す書き込み系コマンド（pin / reaction など）向け。
+/// `--dry-run` では何も出さない。
+pub(crate) fn write_success_line(
+    out: &mut dyn Write,
+    global: &GlobalOpts,
+    message: &str,
+) -> Result<(), SlackCliError> {
+    if global.dry_run {
+        return Ok(());
+    }
+    writeln!(out, "{}", sanitize_single_line_text(message).green())?;
+    Ok(())
+}
+
+/// stdout に出す `write_success`。書き込み先を差し替える必要がないコマンド向け。
+pub(crate) fn report_success(
+    global: &GlobalOpts,
+    message: &str,
+    value: &Value,
+) -> Result<(), SlackCliError> {
+    write_success(&mut std::io::stdout(), global, message, value)
+}
+
 #[cfg(test)]
 mod tests {
+    use crate::cli::GlobalOpts;
+    use crate::output::OutputFormat;
+
+    fn global_with(format: OutputFormat, dry_run: bool) -> GlobalOpts {
+        GlobalOpts {
+            format,
+            dry_run,
+            ..GlobalOpts::default()
+        }
+    }
+
+    fn captured(global: &GlobalOpts) -> String {
+        let mut buf = Vec::new();
+        write_success(
+            &mut buf,
+            global,
+            "✓ done",
+            &json!({ "ok": true, "id": "X1" }),
+        )
+        .unwrap();
+        String::from_utf8(buf).unwrap()
+    }
+
+    #[test]
+    fn success_message_is_printed_when_the_request_really_went_out() {
+        assert!(captured(&global_with(OutputFormat::Table, false)).contains("✓ done"));
+    }
+
+    #[test]
+    fn dry_run_never_claims_success_on_the_table_output() {
+        assert_eq!(captured(&global_with(OutputFormat::Table, true)), "");
+    }
+
+    #[test]
+    fn dry_run_marks_the_machine_readable_output_instead_of_faking_a_result() {
+        let out = captured(&global_with(OutputFormat::Json, true));
+        assert!(out.contains("\"dry_run\""), "output was: {out}");
+        // 送っていないので、あたかも作られたかのような id は出さない。
+        assert!(!out.contains("X1"), "output was: {out}");
+    }
+
+    #[test]
+    fn dry_run_silences_the_single_line_writer_too() {
+        let mut buf = Vec::new();
+        write_success_line(&mut buf, &global_with(OutputFormat::Table, true), "✓ done").unwrap();
+        assert!(buf.is_empty());
+    }
+
     use super::*;
     use serde_json::json;
 
@@ -329,9 +431,18 @@ mod tests {
             json!({ "id": "C0123456789", "name": "General", "name_normalized": "general" }),
             json!({ "id": "C9999999999", "name": "random" }),
         ];
-        assert_eq!(find_channel_id(&channels, "General").as_deref(), Some("C0123456789"));
-        assert_eq!(find_channel_id(&channels, "general").as_deref(), Some("C0123456789"));
-        assert_eq!(find_channel_id(&channels, "#random").as_deref(), Some("C9999999999"));
+        assert_eq!(
+            find_channel_id(&channels, "General").as_deref(),
+            Some("C0123456789")
+        );
+        assert_eq!(
+            find_channel_id(&channels, "general").as_deref(),
+            Some("C0123456789")
+        );
+        assert_eq!(
+            find_channel_id(&channels, "#random").as_deref(),
+            Some("C9999999999")
+        );
         assert_eq!(find_channel_id(&channels, "nope"), None);
     }
 
@@ -339,7 +450,10 @@ mod tests {
     fn not_found_suggests_similar_channels() {
         let channels = vec![json!({ "id": "C0123456789", "name": "general-random" })];
         let message = not_found_error("general", &channels).to_string();
-        assert!(message.contains("Did you mean one of these? general-random"), "{message}");
+        assert!(
+            message.contains("Did you mean one of these? general-random"),
+            "{message}"
+        );
 
         let message = not_found_error("nope", &channels).to_string();
         assert!(message.contains("Make sure you are a member"), "{message}");
@@ -347,7 +461,10 @@ mod tests {
 
     #[test]
     fn timestamps_out_of_range_do_not_panic() {
-        assert_eq!(format_message_timestamp("1700000000.000100"), "2023-11-14 22:13:20");
+        assert_eq!(
+            format_message_timestamp("1700000000.000100"),
+            "2023-11-14 22:13:20"
+        );
         assert_eq!(format_message_timestamp("abc"), INVALID_TIMESTAMP);
         assert_eq!(format_message_timestamp("12abc"), INVALID_TIMESTAMP);
         assert_eq!(format_message_timestamp(""), INVALID_TIMESTAMP);

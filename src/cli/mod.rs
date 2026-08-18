@@ -195,8 +195,8 @@ mod tests {
 
     #[test]
     fn json_shorthand_wins_over_format() {
-        let cli =
-            Cli::try_parse_from(["slack-cli", "auth", "test", "--format", "csv", "--json"]).unwrap();
+        let cli = Cli::try_parse_from(["slack-cli", "auth", "test", "--format", "csv", "--json"])
+            .unwrap();
         assert_eq!(cli.global.output_format(), OutputFormat::Json);
 
         let cli = Cli::try_parse_from(["slack-cli", "auth", "test", "--format", "csv"]).unwrap();
@@ -238,7 +238,16 @@ mod tests {
     fn every_top_level_command_is_registered() {
         for argv in [
             vec!["slack-cli", "send", "-m", "hi"],
-            vec!["slack-cli", "send-ephemeral", "-c", "C1", "-u", "U1", "-m", "hi"],
+            vec![
+                "slack-cli",
+                "send-ephemeral",
+                "-c",
+                "C1",
+                "-u",
+                "U1",
+                "-m",
+                "hi",
+            ],
             vec!["slack-cli", "edit", "-c", "C1", "--ts", "1.1"],
             vec!["slack-cli", "delete", "-c", "C1", "--ts", "1.1"],
             vec!["slack-cli", "history", "-c", "C1"],
@@ -252,7 +261,17 @@ mod tests {
             vec!["slack-cli", "search", "-q", "x"],
             vec!["slack-cli", "users", "list"],
             vec!["slack-cli", "usergroups", "list"],
-            vec!["slack-cli", "reaction", "add", "-c", "C1", "-t", "1.1", "-e", "tada"],
+            vec![
+                "slack-cli",
+                "reaction",
+                "add",
+                "-c",
+                "C1",
+                "-t",
+                "1.1",
+                "-e",
+                "tada",
+            ],
             vec!["slack-cli", "pin", "list", "-c", "C1"],
             vec!["slack-cli", "upload", "-c", "C1"],
             vec!["slack-cli", "download", "-i", "F1"],

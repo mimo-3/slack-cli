@@ -27,7 +27,6 @@ const NO_NAME: &str = "(no name)";
 const SECTIONS_METHOD: &str = "canvases.sections.lookup";
 const FILES_LIST_METHOD: &str = "files.list";
 
-
 #[derive(Args, Debug)]
 pub struct CanvasCommand {
     #[command(subcommand)]

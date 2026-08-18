@@ -136,29 +136,22 @@ impl ProfileConfigManager {
         let path = self.config_path();
         let contents = match fs::read_to_string(&path) {
             Ok(c) => c,
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                return Ok(ConfigStore::default())
-            }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(ConfigStore::default()),
             Err(e) => return Err(e.into()),
         };
 
-        let legacy: LegacyStore = serde_json::from_str(&contents).map_err(|_| {
-            SlackCliError::Configuration(ERR_INVALID_CONFIG_FORMAT.to_string())
-        })?;
+        let legacy: LegacyStore = serde_json::from_str(&contents)
+            .map_err(|_| SlackCliError::Configuration(ERR_INVALID_CONFIG_FORMAT.to_string()))?;
 
-        let needs_migration = legacy
-            .token
-            .as_ref()
-            .is_some_and(|t| !t.is_empty())
-            && legacy.profiles.is_none();
+        let needs_migration =
+            legacy.token.as_ref().is_some_and(|t| !t.is_empty()) && legacy.profiles.is_none();
 
         if needs_migration {
             return self.migrate_legacy_store(legacy);
         }
 
-        serde_json::from_str(&contents).map_err(|_| {
-            SlackCliError::Configuration(ERR_INVALID_CONFIG_FORMAT.to_string())
-        })
+        serde_json::from_str(&contents)
+            .map_err(|_| SlackCliError::Configuration(ERR_INVALID_CONFIG_FORMAT.to_string()))
     }
 
     fn migrate_legacy_store(&self, legacy: LegacyStore) -> Result<ConfigStore, SlackCliError> {
@@ -228,7 +221,10 @@ impl ProfileConfigManager {
     ///
     /// 注意: 保存値が現行形式でない（平文 or 旧形式）場合、現行形式で暗号化し直して
     /// **ディスクへ書き戻す**。読み取り操作が書き込みを起こすのは TS 版と同じ挙動。
-    pub fn get_config(&self, profile: Option<&str>) -> Result<Option<ResolvedConfig>, SlackCliError> {
+    pub fn get_config(
+        &self,
+        profile: Option<&str>,
+    ) -> Result<Option<ResolvedConfig>, SlackCliError> {
         let mut store = self.load_store()?;
         let name = Self::resolve_profile_name(&store, profile);
 
@@ -385,7 +381,11 @@ fn write_private(path: &Path, contents: &str) -> Result<(), SlackCliError> {
         crypto::create_private_dir(parent)?;
     }
 
-    let temp_path = path.with_extension(format!("json.{}.{}.tmp", std::process::id(), epoch_millis()));
+    let temp_path = path.with_extension(format!(
+        "json.{}.{}.tmp",
+        std::process::id(),
+        epoch_millis()
+    ));
 
     let result = (|| -> Result<(), SlackCliError> {
         let mut options = fs::OpenOptions::new();
@@ -466,7 +466,10 @@ mod tests {
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            let file_mode = fs::metadata(mgr.config_path()).unwrap().permissions().mode();
+            let file_mode = fs::metadata(mgr.config_path())
+                .unwrap()
+                .permissions()
+                .mode();
             assert_eq!(file_mode & 0o777, 0o600);
             let dir_mode = fs::metadata(dir.path().join(CONFIG_DIR_NAME))
                 .unwrap()
@@ -488,7 +491,10 @@ mod tests {
             .map(|e| e.file_name().to_string_lossy().to_string())
             .filter(|name| name.ends_with(".tmp"))
             .collect();
-        assert!(leftovers.is_empty(), "temp files left behind: {leftovers:?}");
+        assert!(
+            leftovers.is_empty(),
+            "temp files left behind: {leftovers:?}"
+        );
     }
 
     #[test]
@@ -504,7 +510,10 @@ mod tests {
         mgr.use_profile("work").unwrap();
         assert_eq!(mgr.current_profile().unwrap(), "work");
         // 引数なしなら既定プロファイルが引かれる
-        assert_eq!(mgr.get_config(None).unwrap().unwrap().token, dummy_token("w"));
+        assert_eq!(
+            mgr.get_config(None).unwrap().unwrap().token,
+            dummy_token("w")
+        );
         // 引数があればそちらが勝つ
         assert_eq!(
             mgr.get_config(Some("default")).unwrap().unwrap().token,
@@ -619,7 +628,10 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let mgr = manager(&dir);
         // 環境変数の影響を受けないよう、明示トークン経路だけを見る
-        assert_eq!(mgr.resolve_token(Some("explicit"), None).unwrap(), "explicit");
+        assert_eq!(
+            mgr.resolve_token(Some("explicit"), None).unwrap(),
+            "explicit"
+        );
         assert!(mgr.get_config(None).unwrap().is_none());
         assert!(mgr
             .get_config_or_error(None)

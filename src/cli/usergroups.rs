@@ -337,7 +337,9 @@ mod tests {
         let server = MockServer::start().await;
         let client = client_for(&server);
 
-        let missing = resolve_members_target(&client, None, None).await.unwrap_err();
+        let missing = resolve_members_target(&client, None, None)
+            .await
+            .unwrap_err();
         assert_eq!(missing.to_string(), ERR_MEMBERS_TARGET_MISSING);
 
         let conflict = resolve_members_target(&client, Some("S1".into()), Some("@eng".into()))

@@ -101,7 +101,9 @@ pub async fn run(
 
         UsersSubcommand::Presence { id, name } => {
             let user_id = resolve_presence_target(client, id, name).await?;
-            let response = client.get("users.getPresence", &[("user", &user_id)]).await?;
+            let response = client
+                .get("users.getPresence", &[("user", &user_id)])
+                .await?;
             let presence = response.get("presence").cloned().unwrap_or(Value::Null);
             render_value(&presence_value(&user_id, presence), format)
         }
@@ -189,7 +191,11 @@ fn user_detail_value(user: &Value, format: OutputFormat) -> Value {
         return user.clone();
     }
 
-    let timezone = format!("{} ({})", string_at(user, "tz"), string_at(user, "tz_label"));
+    let timezone = format!(
+        "{} ({})",
+        string_at(user, "tz"),
+        string_at(user, "tz_label")
+    );
     let status = format!(
         "{} {}",
         profile_at(user, "status_emoji"),
@@ -346,7 +352,15 @@ mod tests {
             UsersSubcommand::Presence { .. }
         ));
         assert!(matches!(
-            parse(&["slack-cli", "users", "presence", "--id", "U1", "--name", "@alice"]),
+            parse(&[
+                "slack-cli",
+                "users",
+                "presence",
+                "--id",
+                "U1",
+                "--name",
+                "@alice"
+            ]),
             UsersSubcommand::Presence { .. }
         ));
     }
@@ -434,7 +448,11 @@ mod tests {
             )
             .await
             .unwrap_err();
-            assert_eq!(err.to_string(), ERR_LIMIT, "{raw:?} should have been rejected");
+            assert_eq!(
+                err.to_string(),
+                ERR_LIMIT,
+                "{raw:?} should have been rejected"
+            );
         }
         assert!(server.received_requests().await.unwrap().is_empty());
     }
@@ -523,7 +541,10 @@ mod tests {
         assert_eq!(row["email"], "alice@example.com");
         assert_eq!(row["is_bot"], "No");
         assert_eq!(row["deleted"], "No");
-        assert!(row.get("color").is_none(), "table must not carry raw fields");
+        assert!(
+            row.get("color").is_none(),
+            "table must not carry raw fields"
+        );
 
         let raw = list_value(&users, OutputFormat::Json);
         assert_eq!(raw[0]["color"], "9f69e7");
@@ -551,10 +572,7 @@ mod tests {
         assert!(rows.contains(&("Bot", "No")));
 
         // table 以外は API の生オブジェクトをそのまま通す
-        assert_eq!(
-            user_detail_value(&alice(), OutputFormat::Json),
-            alice(),
-        );
+        assert_eq!(user_detail_value(&alice(), OutputFormat::Json), alice(),);
     }
 
     #[test]
@@ -569,7 +587,9 @@ mod tests {
         let server = MockServer::start().await;
         let client = client_for(&server);
 
-        let missing = resolve_presence_target(&client, None, None).await.unwrap_err();
+        let missing = resolve_presence_target(&client, None, None)
+            .await
+            .unwrap_err();
         assert_eq!(missing.to_string(), ERR_PRESENCE_TARGET_MISSING);
 
         let conflict = resolve_presence_target(&client, Some("U1".into()), Some("@a".into()))

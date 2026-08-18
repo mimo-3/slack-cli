@@ -4,9 +4,8 @@ use crate::error::SlackCliError;
 
 /// YAML を書き出す。serde_yaml はメンテ終了済みのため後継の serde_yaml_ng を使う。
 pub fn write_yaml(value: &serde_json::Value, writer: &mut dyn Write) -> Result<(), SlackCliError> {
-    let output = serde_yaml_ng::to_string(value).map_err(|e| {
-        SlackCliError::Configuration(format!("YAML serialization error: {e}"))
-    })?;
+    let output = serde_yaml_ng::to_string(value)
+        .map_err(|e| SlackCliError::Configuration(format!("YAML serialization error: {e}")))?;
     write!(writer, "{output}")?;
     Ok(())
 }

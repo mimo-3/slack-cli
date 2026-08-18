@@ -133,8 +133,9 @@ impl TokenCryptoService {
                 match write_key_file(path, contents.trim()) {
                     Ok(()) => Ok(key),
                     Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
-                        let existing = fs::read_to_string(path)
-                            .map_err(|_| SlackCliError::Configuration(ERR_MIGRATE_KEY.to_string()))?;
+                        let existing = fs::read_to_string(path).map_err(|_| {
+                            SlackCliError::Configuration(ERR_MIGRATE_KEY.to_string())
+                        })?;
                         parse_key_hex(&existing)
                     }
                     // 旧ファイルは消さない。書けなくても旧鍵で読み書きは続けられる。
@@ -201,9 +202,7 @@ impl TokenCryptoService {
     /// 暗号文を復号する。v2 と旧 v1(CBC) の両方を受ける。
     pub fn decrypt(&self, encrypted: &str) -> Result<String, SlackCliError> {
         if encrypted.is_empty() {
-            return Err(SlackCliError::Validation(
-                ERR_INVALID_ENCRYPTED.to_string(),
-            ));
+            return Err(SlackCliError::Validation(ERR_INVALID_ENCRYPTED.to_string()));
         }
         if is_current_format(encrypted) {
             return self.decrypt_v2(encrypted);
@@ -211,9 +210,7 @@ impl TokenCryptoService {
         if is_legacy_encrypted(encrypted) {
             return decrypt_legacy(encrypted);
         }
-        Err(SlackCliError::Validation(
-            ERR_INVALID_ENCRYPTED.to_string(),
-        ))
+        Err(SlackCliError::Validation(ERR_INVALID_ENCRYPTED.to_string()))
     }
 
     fn decrypt_v2(&self, encrypted: &str) -> Result<String, SlackCliError> {
@@ -257,10 +254,10 @@ impl Default for TokenCryptoService {
 
 fn decrypt_legacy(encrypted: &str) -> Result<String, SlackCliError> {
     let parts: Vec<&str> = encrypted.split(SEPARATOR).collect();
-    let iv = hex::decode(parts[0])
-        .map_err(|_| SlackCliError::Configuration(ERR_DECRYPT.to_string()))?;
-    let ciphertext = hex::decode(parts[1])
-        .map_err(|_| SlackCliError::Configuration(ERR_DECRYPT.to_string()))?;
+    let iv =
+        hex::decode(parts[0]).map_err(|_| SlackCliError::Configuration(ERR_DECRYPT.to_string()))?;
+    let ciphertext =
+        hex::decode(parts[1]).map_err(|_| SlackCliError::Configuration(ERR_DECRYPT.to_string()))?;
 
     let key = derive_key(LEGACY_KEY_PASSWORD, LEGACY_KEY_SALT);
     let decryptor = Aes256CbcDec::new_from_slices(&key, &iv)

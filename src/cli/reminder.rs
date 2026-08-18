@@ -6,11 +6,12 @@ use chrono::{DateTime, Local, NaiveDate, NaiveDateTime, TimeZone, Utc};
 use clap::{Args, Subcommand};
 use serde_json::{json, Value};
 
-use crate::cli::scheduled::{report_success, write_list};
-use crate::output::sanitize::{sanitize_terminal_text, sanitize_value};
+use crate::cli::common::report_success;
+use crate::cli::scheduled::write_list;
 use crate::cli::{parse_positive_int, GlobalOpts};
 use crate::client::SlackClient;
 use crate::error::SlackCliError;
+use crate::output::sanitize::{sanitize_terminal_text, sanitize_value};
 
 pub const ERR_TIMING_REQUIRED: &str = "You must specify either --at or --after";
 pub const ERR_TIMING_CONFLICT: &str = "Cannot use both --at and --after";
@@ -137,13 +138,13 @@ async fn add(
     };
 
     report_success(
+        global,
         &format!(
             "✓ Reminder created: \"{}\" at {}",
             sanitize_terminal_text(&created_text),
             format_iso(created_time)
         ),
-        value,
-        global,
+        &value,
     )
 }
 
@@ -174,9 +175,9 @@ async fn mutate(
     client.post_json(method, &json!({ "reminder": id })).await?;
 
     report_success(
-        &format!("{message_prefix}: {id}"),
-        json!({ "ok": true, "reminder": id }),
         global,
+        &format!("{message_prefix}: {id}"),
+        &json!({ "ok": true, "reminder": id }),
     )
 }
 

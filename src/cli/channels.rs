@@ -56,7 +56,11 @@ pub async fn run(
         .as_deref()
         .map(|raw| parse_positive_int(raw, ERR_LIMIT))
         .transpose()?;
-    let exclude_archived = if cmd.include_archived { "false" } else { "true" };
+    let exclude_archived = if cmd.include_archived {
+        "false"
+    } else {
+        "true"
+    };
 
     let opts = PaginationOpts {
         page_size: Some(limit.unwrap_or(DEFAULT_PAGE_SIZE).min(MAX_PAGE_SIZE)),
@@ -157,7 +161,9 @@ fn channel_kind(channel: &Value) -> &'static str {
 /// 作成時刻を RFC3339（UTC・ミリ秒付き）にする（移植方針 D5）。
 /// TS 版は日付だけ残して `T00:00:00Z` を連結していたため時分秒が失われていた。
 fn format_created(created: Option<i64>) -> String {
-    format_timestamp(created, |dt| dt.to_rfc3339_opts(SecondsFormat::Millis, true))
+    format_timestamp(created, |dt| {
+        dt.to_rfc3339_opts(SecondsFormat::Millis, true)
+    })
 }
 
 /// Unix 秒を UTC の日付（`YYYY-MM-DD`）にする（移植方針 D2）。
@@ -297,7 +303,10 @@ mod tests {
 
     #[test]
     fn created_keeps_the_time_of_day_and_survives_out_of_range_values() {
-        assert_eq!(format_created(Some(1_554_076_845)), "2019-04-01T00:00:45.000Z");
+        assert_eq!(
+            format_created(Some(1_554_076_845)),
+            "2019-04-01T00:00:45.000Z"
+        );
         // 移植方針 D6 / A4: 範囲外でもパニックせず代替表記にする
         assert_eq!(format_created(Some(i64::MAX)), INVALID_TIMESTAMP);
         assert_eq!(format_created(None), INVALID_TIMESTAMP);
@@ -312,7 +321,10 @@ mod tests {
         );
         assert_eq!(sanitize_terminal_text("\u{1b}[31mred\u{1b}[0m"), "red");
         assert_eq!(sanitize_terminal_text("a\u{7}b\u{7f}c\u{9b}d"), "abcd");
-        assert_eq!(sanitize_terminal_text("keep\tthis\nline"), "keep\tthis\nline");
+        assert_eq!(
+            sanitize_terminal_text("keep\tthis\nline"),
+            "keep\tthis\nline"
+        );
         // 絵文字を割らない
         assert_eq!(sanitize_terminal_text("🎉 done"), "🎉 done");
     }
@@ -335,7 +347,9 @@ mod tests {
 
     #[test]
     fn non_empty_result_is_rendered_in_the_requested_format() {
-        let items = vec![map_channel(&json!({ "id": "C0123456789", "name": "general" }))];
+        let items = vec![map_channel(
+            &json!({ "id": "C0123456789", "name": "general" }),
+        )];
         let parsed: Value = serde_json::from_str(&render(&items, OutputFormat::Json)).unwrap();
         assert_eq!(parsed[0]["name"], "general");
         assert!(render(&items, OutputFormat::Table).contains("general"));
@@ -426,7 +440,11 @@ mod tests {
             )
             .await
             .unwrap_err();
-            assert_eq!(err.to_string(), ERR_LIMIT, "{raw:?} should have been rejected");
+            assert_eq!(
+                err.to_string(),
+                ERR_LIMIT,
+                "{raw:?} should have been rejected"
+            );
         }
     }
 
@@ -493,7 +511,9 @@ mod tests {
             ("dev-acejob", "C000000002"),
             ("設計相談", "C000000003"),
         ] {
-            let resolved = resolve_channel_id(&client_for(&server), input).await.unwrap();
+            let resolved = resolve_channel_id(&client_for(&server), input)
+                .await
+                .unwrap();
             assert_eq!(resolved, expected, "{input} resolved to the wrong channel");
         }
     }
@@ -510,13 +530,17 @@ mod tests {
             .mount(&server)
             .await;
 
-        let err = resolve_channel_id(&client_for(&server), "gener").await.unwrap_err();
+        let err = resolve_channel_id(&client_for(&server), "gener")
+            .await
+            .unwrap_err();
         assert_eq!(
             err.to_string(),
             "Channel 'gener' not found. Did you mean one of these? general"
         );
 
-        let err = resolve_channel_id(&client_for(&server), "nope").await.unwrap_err();
+        let err = resolve_channel_id(&client_for(&server), "nope")
+            .await
+            .unwrap_err();
         assert_eq!(
             err.to_string(),
             "Channel 'nope' not found. Make sure you are a member of this channel."
@@ -546,7 +570,9 @@ mod tests {
             .mount(&server)
             .await;
 
-        let resolved = resolve_channel_id(&client_for(&server), "general").await.unwrap();
+        let resolved = resolve_channel_id(&client_for(&server), "general")
+            .await
+            .unwrap();
         assert_eq!(resolved, "C000000001");
     }
 
@@ -562,7 +588,12 @@ mod tests {
             .mount(&server)
             .await;
 
-        let err = resolve_channel_id(&client_for(&server), "general").await.unwrap_err();
-        assert_eq!(err.to_string(), "API Error: missing_scope (needed: chat:write)");
+        let err = resolve_channel_id(&client_for(&server), "general")
+            .await
+            .unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "API Error: missing_scope (needed: chat:write)"
+        );
     }
 }

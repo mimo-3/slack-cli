@@ -68,10 +68,7 @@ pub async fn run(cmd: ConfigCommand, global: &GlobalOpts) -> Result<(), SlackCli
         }
 
         ConfigSubcommand::Get => {
-            let profile = global
-                .profile
-                .clone()
-                .unwrap_or(manager.current_profile()?);
+            let profile = global.profile.clone().unwrap_or(manager.current_profile()?);
 
             match manager.get_config(Some(&profile))? {
                 None => {
@@ -214,10 +211,7 @@ mod tests {
     fn config_use_requires_a_profile_argument() {
         let err = Cli::try_parse_from(["slack-cli", "config", "use"])
             .expect_err("the profile argument is required");
-        assert_eq!(
-            err.kind(),
-            clap::error::ErrorKind::MissingRequiredArgument
-        );
+        assert_eq!(err.kind(), clap::error::ErrorKind::MissingRequiredArgument);
     }
 
     #[test]

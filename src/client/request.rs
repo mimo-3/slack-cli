@@ -113,17 +113,18 @@ impl SlackClient {
     /// リトライ付きでリクエストを実行する。
     ///
     /// `RequestBuilder` は `send()` で消費されるため、毎回作り直せるようクロージャを受ける。
-    pub(crate) async fn request_with_retry<F>(&self, build_request: F) -> Result<Value, SlackCliError>
+    pub(crate) async fn request_with_retry<F>(
+        &self,
+        build_request: F,
+    ) -> Result<Value, SlackCliError>
     where
         F: Fn() -> reqwest::RequestBuilder,
     {
         // 全 API 呼び出しをここで直列化する（移植方針 B4 / B5）。
         // `close()` は呼ばないので acquire が失敗することはない。
-        let _permit = self
-            .concurrency
-            .acquire()
-            .await
-            .map_err(|e| SlackCliError::Configuration(format!("Concurrency limiter closed: {e}")))?;
+        let _permit = self.concurrency.acquire().await.map_err(|e| {
+            SlackCliError::Configuration(format!("Concurrency limiter closed: {e}"))
+        })?;
 
         let mut last_wait = 1u64;
 
@@ -244,9 +245,10 @@ mod tests {
     async fn ok_false_on_http_200_becomes_an_api_error() {
         let server = MockServer::start().await;
         Mock::given(any())
-            .respond_with(ResponseTemplate::new(200).set_body_json(
-                json!({ "ok": false, "error": "channel_not_found" }),
-            ))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_json(json!({ "ok": false, "error": "channel_not_found" })),
+            )
             .mount(&server)
             .await;
 
@@ -381,7 +383,10 @@ mod tests {
         let server = MockServer::start().await;
         Mock::given(method("POST"))
             .and(path("/chat.postMessage"))
-            .and(header("content-type", super::super::auth::CONTENT_TYPE_JSON))
+            .and(header(
+                "content-type",
+                super::super::auth::CONTENT_TYPE_JSON,
+            ))
             .respond_with(
                 ResponseTemplate::new(200)
                     .set_body_json(json!({ "ok": true, "ts": "1700000000.000100" })),
@@ -484,7 +489,10 @@ mod tests {
     fn backoff_grows_and_stays_within_bounds() {
         for attempt in 0..6 {
             let wait = backoff_seconds(2, attempt);
-            assert!((1..=MAX_BACKOFF_SECS + 12).contains(&wait), "wait was {wait}");
+            assert!(
+                (1..=MAX_BACKOFF_SECS + 12).contains(&wait),
+                "wait was {wait}"
+            );
         }
         // 上限を超える指数でも 60 秒 ±20% に収まる
         assert!(backoff_seconds(30, 10) <= MAX_BACKOFF_SECS + 12);

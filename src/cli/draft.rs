@@ -231,15 +231,17 @@ async fn send_draft(
         }
     };
 
-    let sent = format!("✓ Draft sent to {}", format_target(&draft));
+    // dry-run では送信していないので、送ったとは言わないし下書きも消さない。
+    let dry_run = response.get("dry_run").and_then(Value::as_bool) == Some(true);
     if format == OutputFormat::Table {
-        writeln!(out, "{}", sanitize_terminal_text(&sent).green())?;
+        if !dry_run {
+            let sent = format!("✓ Draft sent to {}", format_target(&draft));
+            writeln!(out, "{}", sanitize_terminal_text(&sent).green())?;
+        }
     } else {
         output::format_value(&response, format, out)?;
     }
 
-    // dry-run では送信していないので、下書きは消さない。
-    let dry_run = response.get("dry_run").and_then(Value::as_bool) == Some(true);
     if !keep && !dry_run {
         let note = match store.delete(id) {
             Ok(()) => format!("Draft {} deleted", sanitize_terminal_text(id)).normal(),

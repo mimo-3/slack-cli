@@ -5,8 +5,8 @@
 use clap::Args;
 use serde_json::json;
 
-use crate::cli::common::{channel_label as display_channel, resolve_channel_id};
-use crate::cli::edit::{message_result, report_success, validate_message_ts};
+use crate::cli::common::{channel_label as display_channel, report_success, resolve_channel_id};
+use crate::cli::edit::{message_result, validate_message_ts};
 use crate::cli::GlobalOpts;
 use crate::client::SlackClient;
 use crate::error::SlackCliError;
@@ -38,12 +38,12 @@ pub async fn run(
         .await?;
 
     report_success(
+        global,
         &format!(
             "✓ Message deleted successfully from {}",
             display_channel(&cmd.channel)
         ),
-        message_result(&response, &channel_id, &cmd.ts),
-        global,
+        &message_result(&response, &channel_id, &cmd.ts),
     )
 }
 
@@ -88,9 +88,15 @@ mod tests {
 
     #[test]
     fn parses_channel_and_timestamp() {
-        let cli =
-            Cli::try_parse_from(["slack-cli", "delete", "-c", "C1", "--ts", "1700000000.000100"])
-                .unwrap();
+        let cli = Cli::try_parse_from([
+            "slack-cli",
+            "delete",
+            "-c",
+            "C1",
+            "--ts",
+            "1700000000.000100",
+        ])
+        .unwrap();
         let crate::cli::Command::Delete(cmd) = cli.command else {
             panic!("expected the delete command");
         };
