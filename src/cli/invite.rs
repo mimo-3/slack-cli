@@ -6,12 +6,12 @@ use clap::Args;
 use colored::Colorize;
 use serde_json::{json, Value};
 
-use crate::cli::common::{channel_label, resolve_channel_id};
-use crate::output::sanitize::sanitize_single_line_text;
+use crate::cli::common::{channel_label, resolve_channel_id, write_success_line};
 use crate::cli::GlobalOpts;
 use crate::client::pagination::PaginationOpts;
 use crate::client::SlackClient;
 use crate::error::SlackCliError;
+use crate::output::sanitize::sanitize_single_line_text;
 
 pub const ERR_NO_USERS: &str = "At least one valid user ID is required";
 
@@ -36,7 +36,7 @@ pub struct InviteCommand {
 pub async fn run(
     cmd: InviteCommand,
     client: &SlackClient,
-    _global: &GlobalOpts,
+    global: &GlobalOpts,
 ) -> Result<(), SlackCliError> {
     let references = parse_user_references(&cmd.users)?;
     let channel_id = resolve_channel_id(client, &cmd.channel).await?;
@@ -54,16 +54,14 @@ pub async fn run(
     let response = client.post_json("conversations.invite", &body).await?;
     report_invite_errors(&response, &mut std::io::stderr())?;
 
-    writeln!(
-        std::io::stdout(),
-        "{}",
-        format!(
+    write_success_line(
+        &mut std::io::stdout(),
+        global,
+        &format!(
             "✓ Invited user(s) to channel {}",
             channel_label(&cmd.channel)
-        )
-        .green()
-    )?;
-    Ok(())
+        ),
+    )
 }
 
 /// `--users` をカンマ分割・trim・空要素除去する。1 件も残らなければエラー。

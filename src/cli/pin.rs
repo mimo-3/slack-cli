@@ -5,10 +5,11 @@
 use std::io::Write;
 
 use clap::{Args, Subcommand};
-use colored::Colorize;
 use serde_json::{json, Value};
 
-use crate::cli::common::{channel_label, resolve_channel_id, INVALID_TIMESTAMP};
+use crate::cli::common::{
+    channel_label, resolve_channel_id, write_success_line, INVALID_TIMESTAMP,
+};
 use crate::cli::reaction::validate_message_timestamp;
 use crate::cli::GlobalOpts;
 use crate::error::SlackCliError;
@@ -66,9 +67,11 @@ async fn execute(
     out: &mut dyn Write,
 ) -> Result<(), SlackCliError> {
     match cmd.command {
-        PinSubcommand::Add(args) => write_pin(client, args, "pins.add", "added to", out).await,
+        PinSubcommand::Add(args) => {
+            write_pin(client, args, "pins.add", "added to", global, out).await
+        }
         PinSubcommand::Remove(args) => {
-            write_pin(client, args, "pins.remove", "removed from", out).await
+            write_pin(client, args, "pins.remove", "removed from", global, out).await
         }
         PinSubcommand::List { channel } => list_pins(client, &channel, global, out).await,
     }
@@ -79,6 +82,7 @@ async fn write_pin(
     args: PinTargetArgs,
     method: &str,
     verb: &str,
+    global: &GlobalOpts,
     out: &mut dyn Write,
 ) -> Result<(), SlackCliError> {
     validate_message_timestamp(&args.timestamp)?;
@@ -92,12 +96,7 @@ async fn write_pin(
         .await?;
 
     let label = channel_label(&args.channel);
-    writeln!(
-        out,
-        "{}",
-        format!("✓ Pin {verb} message in {label}").green()
-    )?;
-    Ok(())
+    write_success_line(out, global, &format!("✓ Pin {verb} message in {label}"))
 }
 
 async fn list_pins(
@@ -213,6 +212,29 @@ mod tests {
         let mut buf = Vec::new();
         execute(cmd, client, global, &mut buf).await?;
         Ok(String::from_utf8(buf).unwrap())
+    }
+
+    #[tokio::test]
+    async fn dry_run_does_not_say_the_pin_was_added() {
+        let server = MockServer::start().await;
+        // pins.add のモックは置かない。dry-run なら呼ばれないはず。
+        let client = client_for(&server).with_dry_run(true);
+        let global = GlobalOpts {
+            dry_run: true,
+            ..GlobalOpts::default()
+        };
+
+        let out = run_capture(
+            PinCommand {
+                command: PinSubcommand::Add(target("C0123456789")),
+            },
+            &client,
+            &global,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(out, "", "dry-run なのに成功を名乗っている: {out}");
     }
 
     async fn mount_pins_list(server: &MockServer, items: Value) {
