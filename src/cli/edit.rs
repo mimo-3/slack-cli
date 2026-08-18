@@ -3,20 +3,15 @@
 //! タイムスタンプ検証と成功出力のヘルパは `delete` と共有するためここに置いてある。
 //! チャンネル名解決と端末サニタイズは `cli::common` / `output::sanitize` にある。
 
-use std::io::Write;
-
 use clap::Args;
-use colored::Colorize;
 use serde_json::{json, Value};
 
 use crate::cli::common::{
-    channel_label as display_channel, resolve_channel_id, ERR_INVALID_MESSAGE_TS,
+    channel_label as display_channel, report_success, resolve_channel_id, ERR_INVALID_MESSAGE_TS,
 };
 use crate::cli::GlobalOpts;
 use crate::client::SlackClient;
 use crate::error::SlackCliError;
-use crate::output::sanitize::sanitize_terminal_text;
-use crate::output::{self, OutputFormat};
 
 pub const ERR_INVALID_TS: &str = ERR_INVALID_MESSAGE_TS;
 pub const ERR_MESSAGE_OR_FILE: &str = "You must specify either --message or --file";
@@ -87,12 +82,12 @@ pub async fn run(
 
     let response = client.post_json("chat.update", &body).await?;
     report_success(
+        global,
         &format!(
             "✓ Message updated successfully in {}",
             display_channel(&cmd.channel)
         ),
-        message_result(&response, &channel_id, &cmd.ts),
-        global,
+        &message_result(&response, &channel_id, &cmd.ts),
     )
 }
 
@@ -181,27 +176,16 @@ pub(crate) fn message_result(response: &Value, channel_id: &str, ts: &str) -> Va
     })
 }
 
-/// 既定（table）では TS 版と同じ緑の 1 行、それ以外のフォーマットでは構造化した結果を出す。
-pub(crate) fn report_success(
-    message: &str,
-    value: Value,
-    global: &GlobalOpts,
-) -> Result<(), SlackCliError> {
-    let mut stdout = std::io::stdout();
-    if global.output_format() == OutputFormat::Table {
-        writeln!(stdout, "{}", sanitize_terminal_text(message).green())?;
-        return Ok(());
-    }
-    output::format_value(&value, global.output_format(), &mut stdout)
-}
-
 #[cfg(test)]
 mod tests {
+    use crate::output::{self, OutputFormat};
     use clap::error::ErrorKind;
     use clap::Parser;
     use serde_json::json;
     use url::Url;
-    use wiremock::matchers::{body_partial_json, method, path, query_param, query_param_is_missing};
+    use wiremock::matchers::{
+        body_partial_json, method, path, query_param, query_param_is_missing,
+    };
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
     use super::*;
@@ -381,7 +365,10 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let file = dir.path().join("body.txt");
         std::fs::write(&file, [b'h', b'i', 0xff]).unwrap();
-        assert_eq!(read_text_file(file.to_str().unwrap()).unwrap(), "hi\u{fffd}");
+        assert_eq!(
+            read_text_file(file.to_str().unwrap()).unwrap(),
+            "hi\u{fffd}"
+        );
 
         let missing = dir.path().join("nope.txt");
         let missing = missing.to_str().unwrap().to_string();
