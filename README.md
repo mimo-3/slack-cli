@@ -10,6 +10,13 @@ Node.js も不要になった。
 ## インストール
 
 ```bash
+brew install mimo-3/tap/slack-cli
+```
+
+macOS（Intel / Apple Silicon）と Linux（x86_64）のビルド済みバイナリを配っているので、
+Rust も Node.js も要らない。ソースから入れるなら:
+
+```bash
 cargo install --path .
 ```
 
