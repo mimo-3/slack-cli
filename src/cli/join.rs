@@ -6,7 +6,7 @@ use clap::Args;
 use colored::Colorize;
 use serde_json::{json, Value};
 
-use crate::cli::common::{channel_label, resolve_channel_id};
+use crate::cli::common::{channel_label, resolve_channel_id, write_success_line};
 use crate::cli::GlobalOpts;
 use crate::client::SlackClient;
 use crate::error::SlackCliError;
@@ -22,7 +22,7 @@ pub struct JoinCommand {
 pub async fn run(
     cmd: JoinCommand,
     client: &SlackClient,
-    _global: &GlobalOpts,
+    global: &GlobalOpts,
 ) -> Result<(), SlackCliError> {
     let channel_id = resolve_channel_id(client, &cmd.channel).await?;
     let response = client
@@ -32,12 +32,11 @@ pub async fn run(
     // TS 版は already_in_channel などの warning を握り潰していた（移植方針 G19）
     report_warnings(&response, &mut std::io::stderr())?;
 
-    writeln!(
-        std::io::stdout(),
-        "{}",
-        format!("✓ Joined channel {}", channel_label(&cmd.channel)).green()
-    )?;
-    Ok(())
+    write_success_line(
+        &mut std::io::stdout(),
+        global,
+        &format!("✓ Joined channel {}", channel_label(&cmd.channel)),
+    )
 }
 
 /// Slack が返す warning を stderr に出す。stdout と終了コードには影響させない。

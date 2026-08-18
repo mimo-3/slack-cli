@@ -1,12 +1,9 @@
 //! `slack-cli leave` — チャンネルからの退出。
 
-use std::io::Write;
-
 use clap::Args;
-use colored::Colorize;
 use serde_json::json;
 
-use crate::cli::common::{channel_label, resolve_channel_id};
+use crate::cli::common::{channel_label, resolve_channel_id, write_success_line};
 use crate::cli::GlobalOpts;
 use crate::client::SlackClient;
 use crate::error::SlackCliError;
@@ -21,19 +18,18 @@ pub struct LeaveCommand {
 pub async fn run(
     cmd: LeaveCommand,
     client: &SlackClient,
-    _global: &GlobalOpts,
+    global: &GlobalOpts,
 ) -> Result<(), SlackCliError> {
     let channel_id = resolve_channel_id(client, &cmd.channel).await?;
     client
         .post_json("conversations.leave", &json!({ "channel": channel_id }))
         .await?;
 
-    writeln!(
-        std::io::stdout(),
-        "{}",
-        format!("✓ Left channel {}", channel_label(&cmd.channel)).green()
-    )?;
-    Ok(())
+    write_success_line(
+        &mut std::io::stdout(),
+        global,
+        &format!("✓ Left channel {}", channel_label(&cmd.channel)),
+    )
 }
 
 #[cfg(test)]
