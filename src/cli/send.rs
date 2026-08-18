@@ -8,19 +8,16 @@ use std::io::Write;
 
 use chrono::{Local, NaiveDate, NaiveDateTime, TimeZone, Utc};
 use clap::Args;
-use colored::Colorize;
 use serde_json::{json, Value};
 
 use crate::cli::common::{
     channel_label as format_channel_label, fetch_lookup_channels, find_channel_id, is_channel_id,
-    is_message_ts, not_found_error,
+    is_message_ts, not_found_error, write_success,
 };
 use crate::cli::{parse_positive_int, GlobalOpts};
 use crate::client::pagination::PaginationOpts;
 use crate::client::SlackClient;
 use crate::error::SlackCliError;
-use crate::output::sanitize::sanitize_terminal_text;
-use crate::output::{self, OutputFormat};
 
 pub const ERR_NO_TARGET: &str = "You must specify one of: --channel, --user, or --email";
 pub const ERR_CHANNEL_WITH_DM: &str = "Cannot use --channel with --user or --email";
@@ -104,7 +101,11 @@ pub async fn run(
     validate_message_or_file(&cmd)?;
     let inline_blocks = validate_blocks(&cmd)?;
     validate_thread_ts(cmd.thread.as_deref())?;
-    let post_at = resolve_post_at(cmd.at.as_deref(), cmd.after.as_deref(), Utc::now().timestamp())?;
+    let post_at = resolve_post_at(
+        cmd.at.as_deref(),
+        cmd.after.as_deref(),
+        Utc::now().timestamp(),
+    )?;
 
     let text = read_message_text(&cmd)?;
     let blocks = match &cmd.blocks_file {
@@ -159,11 +160,7 @@ pub(crate) fn finish(
     response: &Value,
 ) -> Result<(), SlackCliError> {
     let mut stdout = std::io::stdout();
-    if global.output_format() == OutputFormat::Table {
-        writeln!(stdout, "{}", sanitize_terminal_text(message).green())?;
-    } else {
-        output::format_value(response, global.output_format(), &mut stdout)?;
-    }
+    write_success(&mut stdout, global, message, response)?;
     stdout.flush()?;
     Ok(())
 }
@@ -181,7 +178,8 @@ pub(crate) async fn post_with_channel_fallback(
         Err(error) => error,
     };
 
-    let is_channel_not_found = matches!(&error, SlackCliError::Api { code, .. } if code == CHANNEL_NOT_FOUND);
+    let is_channel_not_found =
+        matches!(&error, SlackCliError::Api { code, .. } if code == CHANNEL_NOT_FOUND);
     if !is_channel_not_found || is_channel_id(raw_channel) {
         return Err(error);
     }
@@ -215,9 +213,7 @@ fn validate_target(cmd: &SendCommand) -> Result<Target, SlackCliError> {
         (Some(_), Some(_), _) | (Some(_), _, Some(_)) => {
             Err(SlackCliError::Validation(ERR_CHANNEL_WITH_DM.to_string()))
         }
-        (None, Some(_), Some(_)) => {
-            Err(SlackCliError::Validation(ERR_USER_AND_EMAIL.to_string()))
-        }
+        (None, Some(_), Some(_)) => Err(SlackCliError::Validation(ERR_USER_AND_EMAIL.to_string())),
         (Some(channel), None, None) => Ok(Target::Channel(channel.clone())),
         (None, Some(user), None) => Ok(Target::User(user.clone())),
         (None, None, Some(email)) => Ok(Target::Email(email.clone())),
@@ -383,9 +379,7 @@ async fn resolve_target(
                 .get("user")
                 .and_then(|user| user.get("id"))
                 .and_then(Value::as_str)
-                .ok_or_else(|| {
-                    SlackCliError::Validation(format!("User '{email}' not found"))
-                })?;
+                .ok_or_else(|| SlackCliError::Validation(format!("User '{email}' not found")))?;
             let channel = open_dm_channel(client, user_id).await?;
             Ok((channel, email.clone()))
         }
@@ -454,6 +448,8 @@ fn insert(body: &mut Value, key: &str, value: Value) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::output::sanitize::sanitize_terminal_text;
+    use crate::output::{self, OutputFormat};
     use clap::Parser;
     use url::Url;
     use wiremock::matchers::{body_json, method, path};
@@ -522,7 +518,16 @@ mod tests {
         let cases = [
             (vec!["slack-cli", "send", "-m", "hi"], ERR_NO_TARGET),
             (
-                vec!["slack-cli", "send", "-c", "general", "--user", "alice", "-m", "hi"],
+                vec![
+                    "slack-cli",
+                    "send",
+                    "-c",
+                    "general",
+                    "--user",
+                    "alice",
+                    "-m",
+                    "hi",
+                ],
                 ERR_CHANNEL_WITH_DM,
             ),
             (
@@ -561,12 +566,19 @@ mod tests {
 
     #[test]
     fn body_validation_requires_message_file_or_blocks() {
-        let err = validate_message_or_file(&parse(&["slack-cli", "send", "-c", "general"]))
-            .unwrap_err();
+        let err =
+            validate_message_or_file(&parse(&["slack-cli", "send", "-c", "general"])).unwrap_err();
         assert_eq!(err.to_string(), ERR_NO_MESSAGE);
 
         let err = validate_message_or_file(&parse(&[
-            "slack-cli", "send", "-c", "general", "-m", "hi", "-f", "body.txt",
+            "slack-cli",
+            "send",
+            "-c",
+            "general",
+            "-m",
+            "hi",
+            "-f",
+            "body.txt",
         ]))
         .unwrap_err();
         assert_eq!(err.to_string(), ERR_MESSAGE_AND_FILE);
@@ -613,7 +625,13 @@ mod tests {
     fn thread_timestamps_must_be_ten_dot_six_digits() {
         validate_thread_ts(None).unwrap();
         validate_thread_ts(Some("1700000000.000100")).unwrap();
-        for raw in ["1700000000", "170000000.000100", "1700000000.0001", "abc.def", "1700000000.00.100"] {
+        for raw in [
+            "1700000000",
+            "170000000.000100",
+            "1700000000.0001",
+            "abc.def",
+            "1700000000.00.100",
+        ] {
             let err = validate_thread_ts(Some(raw)).unwrap_err();
             assert_eq!(err.to_string(), ERR_INVALID_THREAD_TS, "{raw}");
         }
@@ -644,7 +662,9 @@ mod tests {
             .timestamp();
         assert_eq!(local, expected);
 
-        assert!(resolve_post_at(Some("2030-01-02"), None, now).unwrap().is_some());
+        assert!(resolve_post_at(Some("2030-01-02"), None, now)
+            .unwrap()
+            .is_some());
     }
 
     #[test]
@@ -658,7 +678,9 @@ mod tests {
         );
         for raw in ["Jan 1, 2030", "2030/01/02", "", "12abc"] {
             assert_eq!(
-                resolve_post_at(Some(raw), None, now).unwrap_err().to_string(),
+                resolve_post_at(Some(raw), None, now)
+                    .unwrap_err()
+                    .to_string(),
                 ERR_INVALID_AT,
                 "{raw}"
             );
@@ -677,7 +699,9 @@ mod tests {
         );
         for raw in ["0", "-5", "3.5", "abc"] {
             assert_eq!(
-                resolve_post_at(None, Some(raw), now).unwrap_err().to_string(),
+                resolve_post_at(None, Some(raw), now)
+                    .unwrap_err()
+                    .to_string(),
                 ERR_INVALID_AFTER,
                 "{raw}"
             );
@@ -824,7 +848,16 @@ mod tests {
             .mount(&server)
             .await;
 
-        let cmd = parse(&["slack-cli", "send", "-c", "general", "-m", "hi", "--at", "1900000000"]);
+        let cmd = parse(&[
+            "slack-cli",
+            "send",
+            "-c",
+            "general",
+            "-m",
+            "hi",
+            "--at",
+            "1900000000",
+        ]);
         run(cmd, &client_for(&server), &table_opts()).await.unwrap();
 
         let requests = server.received_requests().await.unwrap();
