@@ -7,14 +7,14 @@
 //! `application/octet-stream` は SDK が偶発的に決めている既定値で、Slack はファイル種別を
 //! 1 段目の `filename` の拡張子だけで判定する。
 
-
 use std::path::Path;
 
 use clap::Args;
-use colored::Colorize;
 use serde_json::{json, Value};
 
-use crate::cli::common::{channel_label as display_channel, resolve_channel_id};
+use crate::cli::common::{
+    channel_label as display_channel, resolve_channel_id, write_success_line,
+};
 use crate::cli::GlobalOpts;
 use crate::client::SlackClient;
 use crate::error::SlackCliError;
@@ -124,14 +124,14 @@ pub async fn run(
         collect_files(&response)
     };
 
-    eprintln!(
-        "{}",
-        format!(
+    write_success_line(
+        &mut std::io::stderr(),
+        global,
+        &format!(
             "✓ File uploaded successfully to {}",
             display_channel(&cmd.channel)
-        )
-        .green()
-    );
+        ),
+    )?;
 
     let value = json!({ "channel": cmd.channel, "files": files });
     output::format_value(&value, global.output_format(), &mut std::io::stdout())?;
@@ -215,12 +215,10 @@ fn required_str(response: &Value, key: &str) -> Result<String, SlackCliError> {
         .and_then(Value::as_str)
         .filter(|value| !value.is_empty())
         .map(str::to_string)
-        .ok_or_else(|| {
-            SlackCliError::Api {
-                status: 200,
-                code: format!("missing_{key}"),
-                needed: Vec::new(),
-            }
+        .ok_or_else(|| SlackCliError::Api {
+            status: 200,
+            code: format!("missing_{key}"),
+            needed: Vec::new(),
         })
 }
 
@@ -231,12 +229,10 @@ async fn post_file_data(
     upload_url: &str,
     data: Vec<u8>,
 ) -> Result<(), SlackCliError> {
-    let url = url::Url::parse(upload_url).map_err(|e| {
-        SlackCliError::Api {
-            status: 200,
-            code: format!("invalid_upload_url: {e}"),
-            needed: Vec::new(),
-        }
+    let url = url::Url::parse(upload_url).map_err(|e| SlackCliError::Api {
+        status: 200,
+        code: format!("invalid_upload_url: {e}"),
+        needed: Vec::new(),
     })?;
 
     if !is_trusted_upload_url(&url, &client.base_url) {
@@ -293,13 +289,10 @@ async fn complete_upload(
     client: &SlackClient,
     opts: &CompleteUpload<'_>,
 ) -> Result<Value, SlackCliError> {
-    let files_json =
-        serde_json::to_string(&json!([{ "id": opts.file_id, "title": opts.title }]))?;
+    let files_json = serde_json::to_string(&json!([{ "id": opts.file_id, "title": opts.title }]))?;
 
-    let mut params: Vec<(&str, &str)> = vec![
-        ("files", &files_json),
-        ("channel_id", opts.channel_id),
-    ];
+    let mut params: Vec<(&str, &str)> =
+        vec![("files", &files_json), ("channel_id", opts.channel_id)];
     if let Some(thread_ts) = opts.thread_ts {
         params.push(("thread_ts", thread_ts));
     }
@@ -459,7 +452,10 @@ mod tests {
 
         cmd.file = Some("notes.md".into());
         cmd.content = Some("hi".into());
-        assert_eq!(load_payload(&cmd).unwrap_err().to_string(), ERR_BOTH_SOURCES);
+        assert_eq!(
+            load_payload(&cmd).unwrap_err().to_string(),
+            ERR_BOTH_SOURCES
+        );
     }
 
     #[test]
@@ -467,7 +463,10 @@ mod tests {
         let mut cmd = command("general");
         cmd.file = Some("/nonexistent/path/report.csv".into());
         let err = load_payload(&cmd).unwrap_err();
-        assert_eq!(err.to_string(), "File not found: /nonexistent/path/report.csv");
+        assert_eq!(
+            err.to_string(),
+            "File not found: /nonexistent/path/report.csv"
+        );
         assert_eq!(err.code(), Some(crate::error::CODE_FILE));
     }
 
@@ -498,7 +497,13 @@ mod tests {
     fn thread_timestamps_must_be_ten_dot_six_digits() {
         assert!(validate_thread_ts(None).is_ok());
         assert!(validate_thread_ts(Some("1700000000.000100")).is_ok());
-        for invalid in ["1700000000", "170000000.000100", "1700000000.00010", "abcdefghij.000100", "1700000000.0001a0"] {
+        for invalid in [
+            "1700000000",
+            "170000000.000100",
+            "1700000000.00010",
+            "abcdefghij.000100",
+            "1700000000.0001a0",
+        ] {
             assert_eq!(
                 validate_thread_ts(Some(invalid)).unwrap_err().to_string(),
                 ERR_INVALID_THREAD,
@@ -562,7 +567,10 @@ mod tests {
         // 2 段目: フィールド名 body / ファイル名 Untitled / パート MIME は octet-stream
         let step2 = body_of(&requests, "/upload/v1/abc123");
         assert!(step2.contains("name=\"body\""), "step2 was: {step2}");
-        assert!(step2.contains("filename=\"Untitled\""), "step2 was: {step2}");
+        assert!(
+            step2.contains("filename=\"Untitled\""),
+            "step2 was: {step2}"
+        );
         assert!(
             step2.contains("application/octet-stream"),
             "step2 was: {step2}"
@@ -577,7 +585,10 @@ mod tests {
             json!([{ "id": "F0123456789", "title": "file.txt" }])
         );
         assert!(step3.contains("channel_id=C0123456789"), "step3: {step3}");
-        assert!(step3.contains("thread_ts=1700000000.000100"), "step3: {step3}");
+        assert!(
+            step3.contains("thread_ts=1700000000.000100"),
+            "step3: {step3}"
+        );
         assert!(step3.contains("initial_comment="), "step3: {step3}");
     }
 
@@ -672,7 +683,10 @@ mod tests {
             .await
             .unwrap_err();
 
-        assert_eq!(err.to_string(), "API Error: missing_scope (needed: files:write)");
+        assert_eq!(
+            err.to_string(),
+            "API Error: missing_scope (needed: files:write)"
+        );
         assert_eq!(server.received_requests().await.unwrap().len(), 1);
     }
 
@@ -728,7 +742,8 @@ mod tests {
             .unwrap_err();
 
         assert!(
-            err.to_string().starts_with("Refusing to upload to a non-Slack host:"),
+            err.to_string()
+                .starts_with("Refusing to upload to a non-Slack host:"),
             "error was: {err}"
         );
         assert!(

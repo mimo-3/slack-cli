@@ -6,10 +6,11 @@
 use std::io::Write;
 
 use clap::{Args, Subcommand};
-use colored::Colorize;
 use serde_json::json;
 
-use crate::cli::common::{channel_label, resolve_channel_id, ERR_INVALID_MESSAGE_TS};
+use crate::cli::common::{
+    channel_label, resolve_channel_id, write_success_line, ERR_INVALID_MESSAGE_TS,
+};
 use crate::cli::GlobalOpts;
 use crate::client::SlackClient;
 use crate::error::SlackCliError;
@@ -61,7 +62,7 @@ pub async fn run(
 async fn execute(
     cmd: ReactionCommand,
     client: &SlackClient,
-    _global: &GlobalOpts,
+    global: &GlobalOpts,
     out: &mut dyn Write,
 ) -> Result<(), SlackCliError> {
     let (args, method, verb) = match cmd.command {
@@ -91,12 +92,11 @@ async fn execute(
     // 移植方針 E2: `--emoji` も利用者入力なのでチャンネル名と同じくサニタイズする
     let shown_emoji = sanitize_single_line_text(&emoji);
     let label = channel_label(&args.channel);
-    writeln!(
+    write_success_line(
         out,
-        "{}",
-        format!("✓ Reaction :{shown_emoji}: {verb} message in {label}").green()
-    )?;
-    Ok(())
+        global,
+        &format!("✓ Reaction :{shown_emoji}: {verb} message in {label}"),
+    )
 }
 
 /// `--timestamp` を `1234567890.123456` の固定形式で検証する。
