@@ -196,12 +196,18 @@ impl ProfileConfigManager {
     }
 
     pub fn require_profile(&self, profile: Option<&str>) -> Result<String, SlackCliError> {
+        Self::profile_from_store(&self.load_store()?, profile)
+    }
+
+    fn profile_from_store(
+        store: &ConfigStore,
+        profile: Option<&str>,
+    ) -> Result<String, SlackCliError> {
         if let Some(name) = profile.filter(|p| !p.trim().is_empty()) {
             return Ok(name.to_string());
         }
-        let store = self.load_store()?;
-        if let Some(name) = store.default_profile {
-            return Ok(name);
+        if let Some(name) = &store.default_profile {
+            return Ok(name.clone());
         }
         let names = store.profiles.keys().cloned().collect::<Vec<_>>();
         let names = if names.is_empty() {
@@ -217,7 +223,7 @@ impl ProfileConfigManager {
     /// トークンを暗号化して保存する。
     pub fn set_token(&self, token: &str, profile: Option<&str>) -> Result<String, SlackCliError> {
         let mut store = self.load_store()?;
-        let name = self.require_profile(profile)?;
+        let name = Self::profile_from_store(&store, profile)?;
 
         store.profiles.insert(
             name.clone(),
@@ -239,11 +245,18 @@ impl ProfileConfigManager {
         &self,
         profile: Option<&str>,
     ) -> Result<Option<ResolvedConfig>, SlackCliError> {
+        Ok(self.get_config_with_name(profile)?.1)
+    }
+
+    pub fn get_config_with_name(
+        &self,
+        profile: Option<&str>,
+    ) -> Result<(String, Option<ResolvedConfig>), SlackCliError> {
         let mut store = self.load_store()?;
-        let name = self.require_profile(profile)?;
+        let name = Self::profile_from_store(&store, profile)?;
 
         let Some(stored) = store.profiles.get(&name).cloned() else {
-            return Ok(None);
+            return Ok((name, None));
         };
 
         let plaintext = if crypto::is_encrypted(&stored.token) {
@@ -260,10 +273,13 @@ impl ProfileConfigManager {
             self.save_store(&store)?;
         }
 
-        Ok(Some(ResolvedConfig {
-            token: plaintext,
-            updated_at: stored.updated_at,
-        }))
+        Ok((
+            name,
+            Some(ResolvedConfig {
+                token: plaintext,
+                updated_at: stored.updated_at,
+            }),
+        ))
     }
 
     /// 設定が無ければエラーにする（TypeScript 版 `getConfigOrThrow` 相当）。
@@ -271,10 +287,10 @@ impl ProfileConfigManager {
         &self,
         profile: Option<&str>,
     ) -> Result<ResolvedConfig, SlackCliError> {
-        if let Some(config) = self.get_config(profile)? {
+        let (name, config) = self.get_config_with_name(profile)?;
+        if let Some(config) = config {
             return Ok(config);
         }
-        let name = self.require_profile(profile)?;
         Err(SlackCliError::Configuration(no_config_message(&name)))
     }
 
@@ -312,8 +328,8 @@ impl ProfileConfigManager {
 
     /// 指定されたプロファイルだけを削除する。
     pub fn clear_config(&self, profile: Option<&str>) -> Result<String, SlackCliError> {
-        let name = self.require_profile(profile)?;
         let mut store = self.load_store()?;
+        let name = Self::profile_from_store(&store, profile)?;
         store.profiles.shift_remove(&name);
         if store.default_profile.as_deref() == Some(&name) {
             store.default_profile = None;
@@ -337,11 +353,7 @@ impl ProfileConfigManager {
                 return Ok(token.to_string());
             }
         }
-        let name = self.require_profile(profile)?;
-        match self.get_config(Some(&name))? {
-            Some(config) => Ok(config.token),
-            None => Err(SlackCliError::Configuration(no_config_message(&name))),
-        }
+        Ok(self.get_config_or_error(profile)?.token)
     }
 }
 
@@ -494,6 +506,22 @@ mod tests {
             leftovers.is_empty(),
             "temp files left behind: {leftovers:?}"
         );
+    }
+
+    #[test]
+    fn profile_resolution_uses_the_supplied_snapshot() {
+        let dir = TempDir::new().unwrap();
+        let mgr = manager(&dir);
+        mgr.set_token(&dummy_token("a"), Some("alpha")).unwrap();
+        mgr.set_token(&dummy_token("b"), Some("beta")).unwrap();
+        mgr.use_profile(Some("alpha")).unwrap();
+        let snapshot = mgr.load_store().unwrap();
+        mgr.use_profile(Some("beta")).unwrap();
+        assert_eq!(
+            ProfileConfigManager::profile_from_store(&snapshot, None).unwrap(),
+            "alpha"
+        );
+        assert_eq!(mgr.require_profile(None).unwrap(), "beta");
     }
 
     #[test]

@@ -73,9 +73,9 @@ pub async fn run(cmd: ConfigCommand, global: &GlobalOpts) -> Result<(), SlackCli
         }
 
         ConfigSubcommand::Get => {
-            let profile = manager.require_profile(global.profile.as_deref())?;
+            let (profile, config) = manager.get_config_with_name(global.profile.as_deref())?;
 
-            match manager.get_config(Some(&profile))? {
+            match config {
                 None => {
                     writeln!(stdout, "{}", no_config_message(&profile).yellow())?;
                 }
