@@ -19,7 +19,7 @@ pub const ERR_NO_TOKEN: &str = "No token provided. Use --token-stdin, set SLACK_
 pub const WARN_TOKEN_FLAG: &str = "Warning: --token may leak secrets via shell history/process \
                                    list. Prefer --token-stdin or interactive input.";
 pub const MSG_NO_PROFILES: &str =
-    "No profiles found. Use \"slack-cli config set --token <token>\" to create one.";
+    "No profiles found. Use \"slack-cli config set --profile <name> --token-stdin\" to create one.";
 
 const TOKEN_ENV_VAR: &str = "SLACK_CLI_TOKEN";
 
@@ -41,12 +41,16 @@ pub enum ConfigSubcommand {
     Get,
     /// List all profiles
     Profiles,
-    /// Switch to a different profile
+    /// Set or clear the default profile
     Use {
-        /// Profile name to switch to
-        profile: String,
+        /// Profile name to set as default
+        #[arg(required_unless_present = "none", conflicts_with = "none")]
+        profile: Option<String>,
+        /// Clear the default profile
+        #[arg(long)]
+        none: bool,
     },
-    /// Show the current active profile
+    /// Show the default profile
     Current,
     /// Clear the configuration of a profile
     Clear,
@@ -58,6 +62,7 @@ pub async fn run(cmd: ConfigCommand, global: &GlobalOpts) -> Result<(), SlackCli
 
     match cmd.command {
         ConfigSubcommand::Set { token_stdin } => {
+            manager.require_profile(global.profile.as_deref())?;
             let token = resolve_token_input(global.token.as_deref(), token_stdin)?;
             let profile = manager.set_token(&token, global.profile.as_deref())?;
             writeln!(
@@ -68,7 +73,7 @@ pub async fn run(cmd: ConfigCommand, global: &GlobalOpts) -> Result<(), SlackCli
         }
 
         ConfigSubcommand::Get => {
-            let profile = global.profile.clone().unwrap_or(manager.current_profile()?);
+            let profile = manager.require_profile(global.profile.as_deref())?;
 
             match manager.get_config(Some(&profile))? {
                 None => {
@@ -109,18 +114,28 @@ pub async fn run(cmd: ConfigCommand, global: &GlobalOpts) -> Result<(), SlackCli
             }
         }
 
-        ConfigSubcommand::Use { profile } => {
-            manager.use_profile(&profile)?;
-            writeln!(
-                stdout,
-                "{}",
-                format!("✓ Switched to profile \"{profile}\"").green()
-            )?;
+        ConfigSubcommand::Use { profile, none: _ } => {
+            manager.use_profile(profile.as_deref())?;
+            match profile {
+                Some(name) => writeln!(stdout, "Default profile: {name}")?,
+                None => writeln!(stdout, "No default profile")?,
+            }
         }
-
         ConfigSubcommand::Current => {
-            let value = json!({ "profile": manager.current_profile()? });
-            output::format_value(&value, global.output_format(), &mut stdout)?;
+            let profile = manager.current_profile()?;
+            if global.output_format() == crate::output::OutputFormat::Table {
+                writeln!(
+                    stdout,
+                    "{}",
+                    profile.unwrap_or_else(|| "No default profile".into())
+                )?;
+            } else {
+                output::format_value(
+                    &json!({ "profile": profile }),
+                    global.output_format(),
+                    &mut stdout,
+                )?;
+            }
         }
 
         ConfigSubcommand::Clear => {

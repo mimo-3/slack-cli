@@ -6,8 +6,7 @@
 //!
 //! ```json
 //! {
-//!   "profiles": { "default": { "token": "v2:...", "updatedAt": "2026-01-01T00:00:00.000Z" } },
-//!   "defaultProfile": "default"
+//!   "profiles": { "work": { "token": "v2:...", "updatedAt": "2026-01-01T00:00:00.000Z" } }
 //! }
 //! ```
 
@@ -50,13 +49,16 @@ impl std::fmt::Debug for StoredProfile {
     }
 }
 
-/// config.json 全体。プロファイルの順序は `clear` 後の既定プロファイル再選出に
-/// 影響するため、`IndexMap` で挿入順を保つ。
+/// config.json 全体。既定プロファイルは任意。
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct ConfigStore {
     #[serde(default)]
     pub profiles: IndexMap<String, StoredProfile>,
-    #[serde(rename = "defaultProfile", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "defaultProfile",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
     pub default_profile: Option<String>,
 }
 
@@ -150,8 +152,16 @@ impl ProfileConfigManager {
             return self.migrate_legacy_store(legacy);
         }
 
-        serde_json::from_str(&contents)
-            .map_err(|_| SlackCliError::Configuration(ERR_INVALID_CONFIG_FORMAT.to_string()))
+        let mut store: ConfigStore = serde_json::from_str(&contents)
+            .map_err(|_| SlackCliError::Configuration(ERR_INVALID_CONFIG_FORMAT.to_string()))?;
+        if store
+            .default_profile
+            .as_ref()
+            .is_some_and(|name| !store.profiles.contains_key(name))
+        {
+            store.default_profile = None;
+        }
+        Ok(store)
     }
 
     fn migrate_legacy_store(&self, legacy: LegacyStore) -> Result<ConfigStore, SlackCliError> {
@@ -173,7 +183,7 @@ impl ProfileConfigManager {
 
         let store = ConfigStore {
             profiles,
-            default_profile: Some(DEFAULT_PROFILE_NAME.to_string()),
+            default_profile: None,
         };
         self.save_store(&store)?;
         Ok(store)
@@ -185,20 +195,29 @@ impl ProfileConfigManager {
         write_private(&self.config_path(), &contents)
     }
 
-    /// プロファイル名の解決順序（全メソッド共通）:
-    /// 引数 → `defaultProfile` → `"default"`。
-    fn resolve_profile_name(store: &ConfigStore, profile: Option<&str>) -> String {
-        profile
-            .filter(|p| !p.is_empty())
-            .map(str::to_string)
-            .or_else(|| store.default_profile.clone())
-            .unwrap_or_else(|| DEFAULT_PROFILE_NAME.to_string())
+    pub fn require_profile(&self, profile: Option<&str>) -> Result<String, SlackCliError> {
+        if let Some(name) = profile.filter(|p| !p.trim().is_empty()) {
+            return Ok(name.to_string());
+        }
+        let store = self.load_store()?;
+        if let Some(name) = store.default_profile {
+            return Ok(name);
+        }
+        let names = store.profiles.keys().cloned().collect::<Vec<_>>();
+        let names = if names.is_empty() {
+            "(none)".to_string()
+        } else {
+            names.join(", ")
+        };
+        Err(SlackCliError::Configuration(format!(
+            "Specify --profile <名前> or set a default with config use <名前>. Registered profiles: {names}"
+        )))
     }
 
     /// トークンを暗号化して保存する。
     pub fn set_token(&self, token: &str, profile: Option<&str>) -> Result<String, SlackCliError> {
         let mut store = self.load_store()?;
-        let name = Self::resolve_profile_name(&store, profile);
+        let name = self.require_profile(profile)?;
 
         store.profiles.insert(
             name.clone(),
@@ -207,11 +226,6 @@ impl ProfileConfigManager {
                 updated_at: now_iso8601(),
             },
         );
-
-        // 既定が未設定のとき、または "default" を設定したときは既定を張り替える
-        if store.default_profile.is_none() || name == DEFAULT_PROFILE_NAME {
-            store.default_profile = Some(name.clone());
-        }
 
         self.save_store(&store)?;
         Ok(name)
@@ -226,7 +240,7 @@ impl ProfileConfigManager {
         profile: Option<&str>,
     ) -> Result<Option<ResolvedConfig>, SlackCliError> {
         let mut store = self.load_store()?;
-        let name = Self::resolve_profile_name(&store, profile);
+        let name = self.require_profile(profile)?;
 
         let Some(stored) = store.profiles.get(&name).cloned() else {
             return Ok(None);
@@ -260,19 +274,13 @@ impl ProfileConfigManager {
         if let Some(config) = self.get_config(profile)? {
             return Ok(config);
         }
-        let store = self.load_store()?;
-        let name = Self::resolve_profile_name(&store, profile);
+        let name = self.require_profile(profile)?;
         Err(SlackCliError::Configuration(no_config_message(&name)))
     }
 
     /// プロファイル一覧。**復号しない**ので `token` は暗号文のまま。
     pub fn list_profiles(&self) -> Result<Vec<ProfileEntry>, SlackCliError> {
         let store = self.load_store()?;
-        let current = store
-            .default_profile
-            .clone()
-            .unwrap_or_else(|| DEFAULT_PROFILE_NAME.to_string());
-
         Ok(store
             .profiles
             .iter()
@@ -280,51 +288,36 @@ impl ProfileConfigManager {
                 name: name.clone(),
                 token: profile.token.clone(),
                 updated_at: profile.updated_at.clone(),
-                is_default: *name == current,
+                is_default: store.default_profile.as_deref() == Some(name.as_str()),
             })
             .collect())
     }
 
-    /// 既定プロファイルを切り替える。存在しない名前はエラー。
-    pub fn use_profile(&self, profile: &str) -> Result<(), SlackCliError> {
+    pub fn current_profile(&self) -> Result<Option<String>, SlackCliError> {
+        Ok(self.load_store()?.default_profile)
+    }
+
+    pub fn use_profile(&self, profile: Option<&str>) -> Result<(), SlackCliError> {
         let mut store = self.load_store()?;
-        if !store.profiles.contains_key(profile) {
-            return Err(SlackCliError::Configuration(format!(
-                "Profile \"{profile}\" does not exist"
-            )));
+        if let Some(name) = profile {
+            if !store.profiles.contains_key(name) {
+                return Err(SlackCliError::Configuration(format!(
+                    "Profile \"{name}\" does not exist"
+                )));
+            }
         }
-        store.default_profile = Some(profile.to_string());
+        store.default_profile = profile.map(str::to_string);
         self.save_store(&store)
     }
 
-    pub fn current_profile(&self) -> Result<String, SlackCliError> {
-        let store = self.load_store()?;
-        Ok(store
-            .default_profile
-            .unwrap_or_else(|| DEFAULT_PROFILE_NAME.to_string()))
-    }
-
-    /// プロファイルを削除する。存在しない名前でもエラーにはしない（TS 版と同じ）。
-    /// 既定を消した場合は残りの先頭を新しい既定にし、残り 0 件なら設定ファイルごと消す。
+    /// 指定されたプロファイルだけを削除する。
     pub fn clear_config(&self, profile: Option<&str>) -> Result<String, SlackCliError> {
+        let name = self.require_profile(profile)?;
         let mut store = self.load_store()?;
-        let name = Self::resolve_profile_name(&store, profile);
         store.profiles.shift_remove(&name);
-
-        if store.default_profile.as_deref() == Some(name.as_str()) {
-            match store.profiles.keys().next() {
-                Some(next) => store.default_profile = Some(next.clone()),
-                None => {
-                    match fs::remove_file(self.config_path()) {
-                        Ok(()) => {}
-                        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-                        Err(e) => return Err(e.into()),
-                    }
-                    return Ok(name);
-                }
-            }
+        if store.default_profile.as_deref() == Some(&name) {
+            store.default_profile = None;
         }
-
         self.save_store(&store)?;
         Ok(name)
     }
@@ -344,9 +337,10 @@ impl ProfileConfigManager {
                 return Ok(token.to_string());
             }
         }
-        match self.get_config(profile)? {
+        let name = self.require_profile(profile)?;
+        match self.get_config(Some(&name))? {
             Some(config) => Ok(config.token),
-            None => Err(SlackCliError::NotAuthenticated),
+            None => Err(SlackCliError::Configuration(no_config_message(&name))),
         }
     }
 }
@@ -441,8 +435,11 @@ mod tests {
         let mgr = manager(&dir);
         let token = dummy_token("alpha");
 
-        assert_eq!(mgr.set_token(&token, None).unwrap(), "default");
-        assert_eq!(mgr.get_config(None).unwrap().unwrap().token, token);
+        assert_eq!(mgr.set_token(&token, Some("default")).unwrap(), "default");
+        assert_eq!(
+            mgr.get_config(Some("default")).unwrap().unwrap().token,
+            token
+        );
     }
 
     #[test]
@@ -450,7 +447,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let mgr = manager(&dir);
         let token = dummy_token("beta");
-        mgr.set_token(&token, None).unwrap();
+        mgr.set_token(&token, Some("default")).unwrap();
 
         let raw = fs::read_to_string(mgr.config_path()).unwrap();
         assert!(!raw.contains(&token), "plaintext token leaked to disk");
@@ -461,7 +458,8 @@ mod tests {
     fn config_file_is_owner_only() {
         let dir = TempDir::new().unwrap();
         let mgr = manager(&dir);
-        mgr.set_token(&dummy_token("perm"), None).unwrap();
+        mgr.set_token(&dummy_token("perm"), Some("default"))
+            .unwrap();
 
         #[cfg(unix)]
         {
@@ -483,7 +481,8 @@ mod tests {
     fn atomic_write_leaves_no_temp_file() {
         let dir = TempDir::new().unwrap();
         let mgr = manager(&dir);
-        mgr.set_token(&dummy_token("atomic"), None).unwrap();
+        mgr.set_token(&dummy_token("atomic"), Some("default"))
+            .unwrap();
 
         let leftovers: Vec<_> = fs::read_dir(dir.path().join(CONFIG_DIR_NAME))
             .unwrap()
@@ -498,67 +497,25 @@ mod tests {
     }
 
     #[test]
-    fn profile_resolution_prefers_argument_then_default_then_literal_default() {
-        let dir = TempDir::new().unwrap();
-        let mgr = manager(&dir);
-
-        mgr.set_token(&dummy_token("d"), None).unwrap();
-        mgr.set_token(&dummy_token("w"), Some("work")).unwrap();
-        // "work" は "default" ではないので既定は据え置き
-        assert_eq!(mgr.current_profile().unwrap(), "default");
-
-        mgr.use_profile("work").unwrap();
-        assert_eq!(mgr.current_profile().unwrap(), "work");
-        // 引数なしなら既定プロファイルが引かれる
-        assert_eq!(
-            mgr.get_config(None).unwrap().unwrap().token,
-            dummy_token("w")
-        );
-        // 引数があればそちらが勝つ
-        assert_eq!(
-            mgr.get_config(Some("default")).unwrap().unwrap().token,
-            dummy_token("d")
-        );
-    }
-
-    #[test]
-    fn use_profile_rejects_unknown_name() {
-        let dir = TempDir::new().unwrap();
-        let mgr = manager(&dir);
-        let err = mgr.use_profile("nope").unwrap_err();
-        assert_eq!(err.to_string(), "Profile \"nope\" does not exist");
-    }
-
-    #[test]
-    fn clear_promotes_the_first_remaining_profile_to_default() {
+    fn clear_does_not_promote_another_profile() {
         let dir = TempDir::new().unwrap();
         let mgr = manager(&dir);
         mgr.set_token(&dummy_token("a"), Some("alpha")).unwrap();
         mgr.set_token(&dummy_token("b"), Some("beta")).unwrap();
-        mgr.use_profile("beta").unwrap();
-
         mgr.clear_config(Some("beta")).unwrap();
-        // 残りの先頭（挿入順で alpha）が新しい既定になる
-        assert_eq!(mgr.current_profile().unwrap(), "alpha");
-    }
-
-    #[test]
-    fn clearing_the_last_profile_removes_the_config_file() {
-        let dir = TempDir::new().unwrap();
-        let mgr = manager(&dir);
-        mgr.set_token(&dummy_token("only"), None).unwrap();
-
-        mgr.clear_config(None).unwrap();
-        assert!(!mgr.config_path().exists());
-        // ファイルが無くても現在のプロファイル照会は "default" を返す
-        assert_eq!(mgr.current_profile().unwrap(), "default");
+        assert!(mgr.get_config(None).is_err());
+        assert!(mgr.get_config(Some("alpha")).unwrap().is_some());
+        assert!(!fs::read_to_string(mgr.config_path())
+            .unwrap()
+            .contains("defaultProfile"));
     }
 
     #[test]
     fn clearing_an_unknown_profile_is_not_an_error() {
         let dir = TempDir::new().unwrap();
         let mgr = manager(&dir);
-        mgr.set_token(&dummy_token("keep"), None).unwrap();
+        mgr.set_token(&dummy_token("keep"), Some("default"))
+            .unwrap();
         assert_eq!(mgr.clear_config(Some("ghost")).unwrap(), "ghost");
         assert!(mgr.get_config(Some("default")).unwrap().is_some());
     }
@@ -580,7 +537,10 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(mgr.get_config(None).unwrap().unwrap().token, token);
+        assert_eq!(
+            mgr.get_config(Some("default")).unwrap().unwrap().token,
+            token
+        );
         // 読み取りが書き戻しを起こしている
         let raw = fs::read_to_string(mgr.config_path()).unwrap();
         assert!(raw.contains("\"v2:"), "not re-encrypted: {raw}");
@@ -602,12 +562,14 @@ mod tests {
         .unwrap();
 
         let store = mgr.load_store().unwrap();
-        assert_eq!(store.default_profile.as_deref(), Some("default"));
         assert_eq!(
             store.profiles["default"].updated_at,
             "2026-01-01T00:00:00.000Z"
         );
-        assert_eq!(mgr.get_config(None).unwrap().unwrap().token, token);
+        assert_eq!(
+            mgr.get_config(Some("default")).unwrap().unwrap().token,
+            token
+        );
     }
 
     #[test]
@@ -624,20 +586,18 @@ mod tests {
     }
 
     #[test]
-    fn missing_config_resolves_to_not_authenticated() {
+    fn missing_profile_is_rejected() {
         let dir = TempDir::new().unwrap();
         let mgr = manager(&dir);
-        // 環境変数の影響を受けないよう、明示トークン経路だけを見る
         assert_eq!(
             mgr.resolve_token(Some("explicit"), None).unwrap(),
             "explicit"
         );
-        assert!(mgr.get_config(None).unwrap().is_none());
         assert!(mgr
-            .get_config_or_error(None)
+            .get_config(None)
             .unwrap_err()
             .to_string()
-            .starts_with("No configuration found for profile \"default\""));
+            .contains("--profile"));
     }
 
     #[test]
@@ -646,14 +606,12 @@ mod tests {
         let mgr = manager(&dir);
         mgr.set_token(&dummy_token("1"), Some("alpha")).unwrap();
         mgr.set_token(&dummy_token("2"), Some("beta")).unwrap();
-        mgr.use_profile("beta").unwrap();
 
         let profiles = mgr.list_profiles().unwrap();
         assert_eq!(
             profiles.iter().map(|p| p.name.as_str()).collect::<Vec<_>>(),
             vec!["alpha", "beta"]
         );
-        assert!(profiles[1].is_default);
         assert!(profiles[0].token.starts_with("v2:"));
     }
 
