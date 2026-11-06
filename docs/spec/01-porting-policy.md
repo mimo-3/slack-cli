@@ -1,3 +1,5 @@
+> この文書は移植元の過去の仕様を記録したものです。現行版では既定プロファイルは任意であり、自動設定や繰り上げはありません。認証と config の現行仕様は [README](../../README.md) を参照してください。
+
 # 移植方針 — TS版の不具合・設計ミスをRust版でどう扱うか
 
 対象: `/Users/mimo/organizations/open-source/slack-cli`（`@mimo-3/slack-cli` v0.24.1、TypeScript）
