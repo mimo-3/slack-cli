@@ -1,3 +1,5 @@
+> この文書は移植元の過去の仕様を記録したものです。現行版では既定プロファイルは任意であり、自動設定や繰り上げはありません。認証と config の現行仕様は [README](../../README.md) を参照してください。
+
 # チャンネル系コマンド仕様書（Rust移植用）
 
 抽出元: `/Users/mimo/organizations/open-source/slack-cli`（`@mimo-3/slack-cli` v0.24.1）
