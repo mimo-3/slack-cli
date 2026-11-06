@@ -43,6 +43,9 @@ fn missing_profile_fails_before_network_including_dry_run_and_drafts() {
     for args in [
         vec!["auth", "test"],
         dry_args(),
+        vec!["send", "-c", "C12345678", "-m", "hello"],
+        vec!["delete", "-c", "C12345678", "--ts", "1234567890.123456"],
+        vec!["upload", "-c", "C12345678", "--content", "hello"],
         vec!["draft", "send", "--id", "1"],
     ] {
         let output = run(
@@ -60,6 +63,7 @@ fn missing_profile_fails_before_network_including_dry_run_and_drafts() {
             "{error}"
         );
         assert!(!error.contains("secret-token"));
+        assert!(!error.contains("invalid_auth"), "{error}");
         assert!(listener.accept().is_err(), "unexpected proxy connection");
     }
     succeeds(&home, &["--help"]);
