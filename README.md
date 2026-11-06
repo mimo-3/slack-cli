@@ -24,14 +24,23 @@ cargo install --path .
 
 ```bash
 # トークンを保存する（argv に残さないので stdin から渡す）
-printf '%s' "$SLACK_TOKEN" | slack-cli config set --token-stdin
+printf '%s' "$SLACK_TOKEN" | slack-cli config set --profile work --token-stdin
 
 # 疎通確認
-slack-cli auth test
+slack-cli auth test --profile work
 
 # 送ってみる
-slack-cli send -c '#general' -m 'hello'
+slack-cli send -c '#general' -m 'hello' --profile work
 ```
+
+既定プロファイルは任意。最初の `config set` では既定にならない。
+`slack-cli config use work` で既定を設定し、`config use --none` で解除できる。
+`config current` で確認し、`config profiles` で登録済みの名前を一覧できる。
+認証は `--token`、`SLACK_CLI_TOKEN`、`--profile <名前>`、設定済みの既定の順に解決する。
+どれもないときは API に通信する前にエラーになる。`--dry-run` でも同じチェックを行う。
+`config set`・`get`・`clear` は `--profile` または既定を使う。
+既定を削除しても別のプロファイルには繰り上がらない。`default` は通常の名前として扱う。
+既存の `defaultProfile` は、対象が存在すれば既定として使う。
 
 ## 何ができるか
 
@@ -65,7 +74,7 @@ slack-cli send -c '#general' -m 'hello'
 
 ## TypeScript 版からの変更点
 
-コマンド名・オプション名・JSON 出力の構造・終了コードは変えていない。
+既定プロファイルを任意にしたため、認証と config コマンドの一部は TypeScript 版と異なる。
 一方で、TypeScript 版にあった不具合は直した。主なものは 4 つ。
 
 - `--limit` に数字以外を渡すと、そのまま Slack API に流れて空の結果が返っていた。今は弾く

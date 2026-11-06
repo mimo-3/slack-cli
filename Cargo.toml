@@ -31,8 +31,7 @@ reqwest = { version = "0.12", features = [
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync"] }
 url = "2"
 
-# serde。preserve_order は設定ファイルのプロファイル順を保つために必須
-# （clear 時の「残りの先頭を新 default にする」挙動がキー順に依存する）
+# serde。preserve_order は設定ファイルなどの表示順を保つために使う
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
 # serde_yaml はメンテ終了済みのため後継の serde_yaml_ng を使う
