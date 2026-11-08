@@ -39,7 +39,7 @@ const USER_LOOKUP_PAGE_SIZE: u32 = 200;
 /// dry-run では `conversations.open` が実行されないため、DM 先の代わりに置く印。
 const DRY_RUN_CHANNEL: &str = "(dry-run)";
 
-#[derive(Args, Debug)]
+#[derive(Args, Debug, Clone)]
 pub struct SendCommand {
     /// Target channel name or ID
     #[arg(short, long, value_name = "CHANNEL")]
@@ -69,7 +69,7 @@ pub struct SendCommand {
     #[arg(long, value_name = "FILE")]
     pub blocks_file: Option<String>,
 
-    /// Image path to attach (repeatable; png/jpg/jpeg/gif/webp; incompatible with --at/--after)
+    /// Image path to attach (repeatable; png/jpg/jpeg/gif; incompatible with --at/--after)
     #[arg(long, value_name = "PATH")]
     pub image: Vec<String>,
 
@@ -130,11 +130,18 @@ pub async fn run(
     }
     if !images.is_empty() {
         let value = blocks.take().unwrap_or_else(|| {
-            if text.is_empty() {
-                json!([])
-            } else {
-                json!([{ "type": "section", "text": {"type": "mrkdwn", "text": text} }])
+            let mut sections = Vec::new();
+            let mut start = 0;
+            for (count, (offset, _)) in text.char_indices().enumerate() {
+                if count > 0 && count % 3000 == 0 {
+                    sections.push(json!({"type": "section", "text": {"type": "mrkdwn", "text": &text[start..offset]}}));
+                    start = offset;
+                }
             }
+            if start < text.len() {
+                sections.push(json!({"type": "section", "text": {"type": "mrkdwn", "text": &text[start..]}}));
+            }
+            Value::Array(sections)
         });
         let mut items = value.as_array().expect("validated blocks array").clone();
         if items.len() + images.len() > 50 {
@@ -336,7 +343,7 @@ fn load_images(cmd: &SendCommand) -> Result<Vec<(String, Vec<u8>)>, SlackCliErro
                 .and_then(|s| s.to_str())
                 .unwrap_or("")
                 .to_ascii_lowercase();
-            if !matches!(extension.as_str(), "png" | "jpg" | "jpeg" | "gif" | "webp") {
+            if !matches!(extension.as_str(), "png" | "jpg" | "jpeg" | "gif") {
                 return Err(SlackCliError::Validation(format!(
                     "Unsupported image extension: {path}"
                 )));
@@ -695,7 +702,7 @@ mod tests {
     async fn image_validation_and_dry_run_never_write() {
         let server = MockServer::start().await;
         let dir = tempfile::tempdir().unwrap();
-        let image = dir.path().join("photo.webp");
+        let image = dir.path().join("photo.png");
         std::fs::write(&image, b"fixture").unwrap();
         let args = [
             "slack-cli",
@@ -716,7 +723,7 @@ mod tests {
             .unwrap_err()
             .to_string()
             .contains("--image cannot"));
-        for filename in ["image.svg", "missing.png"] {
+        for filename in ["image.svg", "image.webp", "image.WEBP", "missing.png"] {
             let cmd = parse(&[
                 "slack-cli",
                 "send",
@@ -733,6 +740,64 @@ mod tests {
         let mut cmd = parse(&args);
         cmd.blocks = Some(serde_json::to_string(&vec![json!({"type":"divider"}); 50]).unwrap());
         assert!(run(cmd, &client_for(&server), &table_opts()).await.is_err());
+        assert!(server.received_requests().await.unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn image_message_splits_unicode_and_checks_block_limits_before_upload() {
+        let server = MockServer::start().await;
+        mount_image_upload(&server).await;
+        Mock::given(method("GET"))
+            .and(path("/files.info"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_json(json!({"ok": true, "file": {"mimetype": "image/png"}})),
+            )
+            .mount(&server)
+            .await;
+        mount_ok(&server, "chat.postMessage").await;
+        let dir = tempfile::tempdir().unwrap();
+        let image = dir.path().join("photo.png");
+        std::fs::write(&image, b"fixture").unwrap();
+        let mut cmd = parse(&[
+            "slack-cli",
+            "send",
+            "-c",
+            "C0123456789",
+            "-m",
+            "x",
+            "--image",
+            image.to_str().unwrap(),
+        ]);
+        let message = format!("{}😀", "あ".repeat(3000));
+        cmd.message = Some(message.clone());
+        run(cmd.clone(), &client_for(&server), &table_opts())
+            .await
+            .unwrap();
+        let requests = server.received_requests().await.unwrap();
+        let post = requests
+            .iter()
+            .find(|r| r.url.path() == "/chat.postMessage")
+            .unwrap();
+        let body: Value = serde_json::from_slice(&post.body).unwrap();
+        assert_eq!(body["text"], message);
+        assert_eq!(body["blocks"].as_array().unwrap().len(), 3);
+        assert_eq!(body["blocks"][0]["text"]["text"], "あ".repeat(3000));
+        assert_eq!(body["blocks"][1]["text"]["text"], "😀");
+        server.reset().await;
+        cmd.message = Some("a".repeat(49 * 3000 + 1));
+        assert!(run(cmd.clone(), &client_for(&server), &table_opts())
+            .await
+            .unwrap_err()
+            .to_string()
+            .contains("at most 50 blocks"));
+        cmd.message = Some("x".into());
+        cmd.blocks = Some(serde_json::to_string(&vec![json!({"type":"divider"}); 50]).unwrap());
+        assert!(run(cmd, &client_for(&server), &table_opts())
+            .await
+            .unwrap_err()
+            .to_string()
+            .contains("at most 50 blocks"));
         assert!(server.received_requests().await.unwrap().is_empty());
     }
 
