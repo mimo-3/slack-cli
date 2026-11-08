@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.0
 
 - `upload` の `--channel` を任意にし、省略時はどこにも共有しない非公開アップロードに対応。
 - `upload --blocks` / `--blocks-file` で本文とファイルをまとめて投稿できるように変更。
