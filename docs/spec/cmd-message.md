@@ -6,7 +6,7 @@
 
 | オプション | 動作 |
 | --- | --- |
-| `--image <PATH>` | png/jpg/jpeg/gif/webp を添付。繰り返し指定可。画像だけでも送信可 |
+| `--image <PATH>` | png/jpg/jpeg/gif を添付。繰り返し指定可。画像だけでも送信可 |
 | `--image-alt <TEXT>` | 全画像共通の代替テキスト。省略時は各ファイル名。1〜2000文字 |
 
 送信前に全画像の拡張子と読み取り、blocksを検証する。拡張子の大文字・小文字は区別しない。
@@ -17,7 +17,7 @@
 APIエラーやタイムアウトはそのまま失敗とし、投稿しない。`files:write` と `files:read` が必要。
 
 指定されたblocks配列の末尾へ `{"type":"image","slack_file":{"id":"<file id>"},"alt_text":"<alt>"}` を追加する。
-blocks未指定なら本文（`-m` または `--file`）を先頭の section(mrkdwn) にする。空本文なら画像だけ。
+blocks未指定なら本文（`-m` または `--file`）を3000文字ごとに分割して先頭の section(mrkdwn) にする。空本文なら画像だけ。
 画像を含む合計50ブロックを上限とする。`text` は従来どおり通知用本文として渡す。
 全画像の準備後に `chat.postMessage` を呼ぶ。画像ごとの共有投稿は作らない。
 `invalid_blocks` に限り1.5秒待って最大3回再試行し、アップロードは繰り返さない。
