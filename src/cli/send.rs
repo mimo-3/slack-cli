@@ -69,6 +69,14 @@ pub struct SendCommand {
     #[arg(long, value_name = "FILE")]
     pub blocks_file: Option<String>,
 
+    /// Image path to attach (repeatable; png/jpg/jpeg/gif/webp; incompatible with --at/--after)
+    #[arg(long, value_name = "PATH")]
+    pub image: Vec<String>,
+
+    /// Alternative text for all attached images (defaults to each filename)
+    #[arg(long, value_name = "TEXT", requires = "image")]
+    pub image_alt: Option<String>,
+
     /// Thread timestamp to reply to
     #[arg(short, long, value_name = "THREAD")]
     pub thread: Option<String>,
@@ -108,10 +116,45 @@ pub async fn run(
     )?;
 
     let text = read_message_text(&cmd)?;
-    let blocks = match &cmd.blocks_file {
+    let mut blocks = match &cmd.blocks_file {
         Some(path) => Some(read_blocks_file(path)?),
         None => inline_blocks,
     };
+
+    // Validate and read every image before any write, including DM creation.
+    let images = load_images(&cmd)?;
+    if !images.is_empty() && post_at.is_some() {
+        return Err(SlackCliError::Validation(
+            "--image cannot be combined with --at or --after".into(),
+        ));
+    }
+    if !images.is_empty() {
+        let value = blocks.take().unwrap_or_else(|| {
+            if text.is_empty() {
+                json!([])
+            } else {
+                json!([{ "type": "section", "text": {"type": "mrkdwn", "text": text} }])
+            }
+        });
+        let mut items = value.as_array().expect("validated blocks array").clone();
+        if items.len() + images.len() > 50 {
+            return Err(SlackCliError::Validation(
+                "Messages support at most 50 blocks".into(),
+            ));
+        }
+        for (index, (filename, data)) in images.into_iter().enumerate() {
+            let id = if client.dry_run {
+                format!("DRY_RUN_IMAGE_{}", index + 1)
+            } else {
+                let id = super::upload::upload_private(client, data, &filename).await?;
+                wait_for_image(client, &id, std::time::Duration::from_secs(30)).await?;
+                id
+            };
+            items.push(json!({"type": "image", "slack_file": {"id": id},
+                "alt_text": cmd.image_alt.as_deref().unwrap_or(&filename)}));
+        }
+        blocks = Some(Value::Array(items));
+    }
 
     let (channel, label) = resolve_target(client, &target).await?;
 
@@ -144,9 +187,21 @@ pub async fn run(
     };
 
     // DM は解決済みのチャンネル ID なので、名前解決フォールバックの対象にしない。
-    let response = match &target {
-        Target::Channel(raw) => post_with_channel_fallback(client, method, &body, raw).await?,
-        _ => client.post_json(method, &body).await?,
+    let mut retries = 0;
+    let response = loop {
+        let result = match &target {
+            Target::Channel(raw) => post_with_channel_fallback(client, method, &body, raw).await,
+            _ => client.post_json(method, &body).await,
+        };
+        match result {
+            Err(SlackCliError::Api { ref code, .. })
+                if code == "invalid_blocks" && !cmd.image.is_empty() && retries < 3 =>
+            {
+                retries += 1;
+                tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
+            }
+            other => break other?,
+        }
     };
 
     finish(global, &message, &response)
@@ -224,7 +279,8 @@ fn validate_message_or_file(cmd: &SendCommand) -> Result<(), SlackCliError> {
     let has_body = cmd.message.is_some()
         || cmd.file.is_some()
         || cmd.blocks.is_some()
-        || cmd.blocks_file.is_some();
+        || cmd.blocks_file.is_some()
+        || !cmd.image.is_empty();
     if !has_body {
         return Err(SlackCliError::Validation(ERR_NO_MESSAGE.to_string()));
     }
@@ -237,10 +293,28 @@ fn validate_message_or_file(cmd: &SendCommand) -> Result<(), SlackCliError> {
 /// `--blocks` / `--blocks-file` の排他と、`--blocks` のパースを済ませる。
 /// TypeScript 版は検証と本体で 2 回パースしていたが、ここでは 1 回で持ち回る。
 fn validate_blocks(cmd: &SendCommand) -> Result<Option<Value>, SlackCliError> {
-    if cmd.blocks.is_some() && cmd.blocks_file.is_some() {
+    validate_blocks_options(cmd.blocks.as_deref(), cmd.blocks_file.as_deref())
+}
+
+pub(crate) fn load_blocks(
+    inline: Option<&str>,
+    file: Option<&str>,
+) -> Result<Option<Value>, SlackCliError> {
+    let parsed = validate_blocks_options(inline, file)?;
+    match file {
+        Some(path) => Ok(Some(read_blocks_file(path)?)),
+        None => Ok(parsed),
+    }
+}
+
+fn validate_blocks_options(
+    inline: Option<&str>,
+    file: Option<&str>,
+) -> Result<Option<Value>, SlackCliError> {
+    if inline.is_some() && file.is_some() {
         return Err(SlackCliError::Validation(ERR_BOTH_BLOCKS.to_string()));
     }
-    let Some(raw) = &cmd.blocks else {
+    let Some(raw) = inline else {
         return Ok(None);
     };
 
@@ -250,6 +324,66 @@ fn validate_blocks(cmd: &SendCommand) -> Result<Option<Value>, SlackCliError> {
         return Err(SlackCliError::Validation(ERR_INVALID_BLOCKS.to_string()));
     }
     Ok(Some(parsed))
+}
+
+fn load_images(cmd: &SendCommand) -> Result<Vec<(String, Vec<u8>)>, SlackCliError> {
+    cmd.image
+        .iter()
+        .map(|path| {
+            let path_ref = std::path::Path::new(path);
+            let extension = path_ref
+                .extension()
+                .and_then(|s| s.to_str())
+                .unwrap_or("")
+                .to_ascii_lowercase();
+            if !matches!(extension.as_str(), "png" | "jpg" | "jpeg" | "gif" | "webp") {
+                return Err(SlackCliError::Validation(format!(
+                    "Unsupported image extension: {path}"
+                )));
+            }
+            let filename = path_ref
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .into_owned();
+            let alt = cmd.image_alt.as_deref().unwrap_or(&filename);
+            if alt.trim().is_empty() || alt.chars().count() > 2000 {
+                return Err(SlackCliError::Validation(
+                    "Image alt text must contain 1 to 2000 characters".into(),
+                ));
+            }
+            let data = std::fs::read(path)
+                .map_err(|e| SlackCliError::File(format!("Error reading image {path}: {e}")))?;
+            Ok((filename, data))
+        })
+        .collect()
+}
+
+async fn wait_for_image(
+    client: &SlackClient,
+    id: &str,
+    timeout: std::time::Duration,
+) -> Result<(), SlackCliError> {
+    let deadline = tokio::time::Instant::now() + timeout;
+    let poll = async {
+        loop {
+            let response = client.get("files.info", &[("file", id)]).await?;
+            if response["file"]["mimetype"]
+                .as_str()
+                .is_some_and(|s| !s.is_empty())
+            {
+                return Ok(());
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
+        }
+    };
+    tokio::time::timeout_at(deadline, poll)
+        .await
+        .unwrap_or_else(|_| {
+            Err(SlackCliError::File(format!(
+                "Timed out waiting for image processing: {id}"
+            )))
+        })
 }
 
 /// `--at` / `--after` を Unix 秒に落とす。指定が無ければ即時送信（`None`）。
@@ -461,6 +595,237 @@ mod tests {
         SlackClient::new("test-token-value")
             .unwrap()
             .with_base_url(Url::parse(&format!("{}/", server.uri())).unwrap())
+    }
+
+    async fn mount_image_upload(server: &MockServer) {
+        Mock::given(method("POST"))
+            .and(path("/files.getUploadURLExternal"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "ok": true, "file_id": "FIMAGE", "upload_url": format!("{}/upload", server.uri())
+            })))
+            .mount(server)
+            .await;
+        Mock::given(method("POST"))
+            .and(path("/upload"))
+            .respond_with(ResponseTemplate::new(200))
+            .mount(server)
+            .await;
+        Mock::given(method("POST"))
+            .and(path("/files.completeUploadExternal"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_json(json!({"ok": true, "files": [{"id": "FIMAGE"}]})),
+            )
+            .mount(server)
+            .await;
+    }
+
+    #[tokio::test]
+    async fn images_are_private_then_appended_to_one_message() {
+        for custom_blocks in [false, true] {
+            let server = MockServer::start().await;
+            mount_image_upload(&server).await;
+            let polls = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+            let count = polls.clone();
+            Mock::given(method("GET")).and(path("/files.info"))
+                .respond_with(move |_: &wiremock::Request| {
+                    let n = count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    ResponseTemplate::new(200).set_body_json(json!({"ok": true, "file": {"mimetype": if n == 0 { "" } else { "image/png" }}}))
+                }).mount(&server).await;
+            mount_ok(&server, "chat.postMessage").await;
+            let dir = tempfile::tempdir().unwrap();
+            let image = dir.path().join("photo.PNG");
+            std::fs::write(&image, b"image fixture").unwrap();
+            let mut cmd = parse(&[
+                "slack-cli",
+                "send",
+                "-c",
+                "C0123456789",
+                "-m",
+                "hello",
+                "--image",
+                image.to_str().unwrap(),
+                "--image",
+                image.to_str().unwrap(),
+            ]);
+            if custom_blocks {
+                let blocks_file = dir.path().join("blocks.json");
+                std::fs::write(&blocks_file, r#"[{"type":"divider"}]"#).unwrap();
+                cmd.blocks_file = Some(blocks_file.to_string_lossy().into_owned());
+                cmd.thread = Some("1700000000.000100".into());
+                cmd.image_alt = Some("A photo".into());
+            }
+            run(cmd, &client_for(&server), &table_opts()).await.unwrap();
+            let requests = server.received_requests().await.unwrap();
+            let posts: Vec<_> = requests
+                .iter()
+                .filter(|r| r.url.path() == "/chat.postMessage")
+                .collect();
+            assert_eq!(posts.len(), 1);
+            let body: Value = serde_json::from_slice(&posts[0].body).unwrap();
+            assert_eq!(body["text"], "hello");
+            if custom_blocks {
+                assert_eq!(body["thread_ts"], "1700000000.000100");
+            }
+            assert_eq!(body["blocks"].as_array().unwrap().len(), 3);
+            assert_eq!(
+                body["blocks"][0]["type"],
+                if custom_blocks { "divider" } else { "section" }
+            );
+            assert_eq!(body["blocks"][1]["slack_file"]["id"], "FIMAGE");
+            assert_eq!(
+                body["blocks"][2]["alt_text"],
+                if custom_blocks {
+                    "A photo"
+                } else {
+                    "photo.PNG"
+                }
+            );
+            for completion in requests
+                .iter()
+                .filter(|r| r.url.path() == "/files.completeUploadExternal")
+            {
+                assert!(!String::from_utf8_lossy(&completion.body).contains("channel_id"));
+            }
+            assert_eq!(polls.load(std::sync::atomic::Ordering::SeqCst), 3);
+        }
+    }
+
+    #[tokio::test]
+    async fn image_validation_and_dry_run_never_write() {
+        let server = MockServer::start().await;
+        let dir = tempfile::tempdir().unwrap();
+        let image = dir.path().join("photo.webp");
+        std::fs::write(&image, b"fixture").unwrap();
+        let args = [
+            "slack-cli",
+            "send",
+            "-c",
+            "C0123456789",
+            "--image",
+            image.to_str().unwrap(),
+        ];
+        let cmd = parse(&args);
+        run(cmd, &client_for(&server).with_dry_run(true), &table_opts())
+            .await
+            .unwrap();
+        let mut cmd = parse(&args);
+        cmd.after = Some("10".into());
+        assert!(run(cmd, &client_for(&server), &table_opts())
+            .await
+            .unwrap_err()
+            .to_string()
+            .contains("--image cannot"));
+        for filename in ["image.svg", "missing.png"] {
+            let cmd = parse(&[
+                "slack-cli",
+                "send",
+                "-c",
+                "C0123456789",
+                "--image",
+                filename,
+            ]);
+            assert!(run(cmd, &client_for(&server), &table_opts()).await.is_err());
+        }
+        let mut cmd = parse(&args);
+        cmd.image.push("missing.png".into());
+        assert!(run(cmd, &client_for(&server), &table_opts()).await.is_err());
+        let mut cmd = parse(&args);
+        cmd.blocks = Some(serde_json::to_string(&vec![json!({"type":"divider"}); 50]).unwrap());
+        assert!(run(cmd, &client_for(&server), &table_opts()).await.is_err());
+        assert!(server.received_requests().await.unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn processing_timeout_and_api_error_stop_before_message() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/files.info"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({"ok": true, "file": {}})))
+            .mount(&server)
+            .await;
+        let err = wait_for_image(
+            &client_for(&server),
+            "FIMAGE",
+            std::time::Duration::from_millis(30),
+        )
+        .await
+        .unwrap_err();
+        assert!(err.to_string().contains("Timed out"));
+        server.reset().await;
+        Mock::given(method("GET"))
+            .and(path("/files.info"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_json(json!({"ok": false, "error": "missing_scope"})),
+            )
+            .mount(&server)
+            .await;
+        let err = wait_for_image(
+            &client_for(&server),
+            "FIMAGE",
+            std::time::Duration::from_secs(1),
+        )
+        .await
+        .unwrap_err();
+        assert!(err.to_string().contains("missing_scope"));
+    }
+
+    #[tokio::test]
+    async fn image_invalid_blocks_retries_are_bounded() {
+        for succeeds in [true, false] {
+            let server = MockServer::start().await;
+            mount_image_upload(&server).await;
+            Mock::given(method("GET"))
+                .and(path("/files.info"))
+                .respond_with(
+                    ResponseTemplate::new(200)
+                        .set_body_json(json!({"ok":true,"file":{"mimetype":"image/png"}})),
+                )
+                .mount(&server)
+                .await;
+            let attempts = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+            let count = attempts.clone();
+            Mock::given(method("POST"))
+                .and(path("/chat.postMessage"))
+                .respond_with(move |_: &wiremock::Request| {
+                    let n = count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    ResponseTemplate::new(200).set_body_json(if succeeds && n == 1 {
+                        json!({"ok": true, "ts":"1700000000.000100"})
+                    } else {
+                        json!({"ok":false,"error":"invalid_blocks"})
+                    })
+                })
+                .mount(&server)
+                .await;
+            let dir = tempfile::tempdir().unwrap();
+            let image = dir.path().join("photo.png");
+            std::fs::write(&image, b"fixture").unwrap();
+            let cmd = parse(&[
+                "slack-cli",
+                "send",
+                "-c",
+                "C0123456789",
+                "--image",
+                image.to_str().unwrap(),
+            ]);
+            assert_eq!(
+                run(cmd, &client_for(&server), &table_opts()).await.is_ok(),
+                succeeds
+            );
+            assert_eq!(
+                attempts.load(std::sync::atomic::Ordering::SeqCst),
+                if succeeds { 2 } else { 4 }
+            );
+            let requests = server.received_requests().await.unwrap();
+            assert_eq!(
+                requests
+                    .iter()
+                    .filter(|r| r.url.path() == "/files.getUploadURLExternal")
+                    .count(),
+                1
+            );
+        }
     }
 
     fn parse(argv: &[&str]) -> SendCommand {
