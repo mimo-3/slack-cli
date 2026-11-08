@@ -62,6 +62,36 @@ slack-cli send -c '#general' -m 'hello' --profile work
 `--token` `--profile` `--format`（table・json・yaml・csv・tsv・id-only）`--json`
 `--dry-run` `--no-color`。
 
+## 本文と画像をまとめて送る
+
+```bash
+# 本文と画像を1つのメッセージにする。--image は繰り返せる
+slack-cli send -c '#general' -m '確認をお願いします' --image screenshot.png --profile work
+slack-cli send -c '#general' --blocks-file body.json --image first.jpg --image second.webp --image-alt '画面の比較' --profile work
+
+# どこにも共有せずにアップロードする。出力の files[].id を後から利用できる
+slack-cli upload -f screenshot.png --json --profile work
+
+# ファイルと blocks の本文をまとめてチャンネルへ投稿する
+slack-cli upload -c '#general' -f report.csv --blocks-file body.json --profile work
+```
+
+`upload` は `--channel` を省略すると非公開アップロードになる。
+`--thread`・`--message`・`--blocks`・`--blocks-file` には `--channel` が必要。
+`--blocks` と `--blocks-file` は JSON 配列を受け取り、互いに併用できない。`--message` と blocks も併用できない。
+JSON と table の出力にはファイル ID が含まれる。
+
+`send --image` は png・jpg・jpeg・gif・webp を受け取る（拡張子の大文字・小文字は区別しない）。
+各画像を非公開でアップロードし、`files.info` の `mimetype` が埋まるまで1.5秒間隔で最大30秒待つ。
+`files:write` に加えて `files:read` が必要。
+指定済みの blocks の末尾に画像を追加する。blocks がなければ本文を mrkdwn の section にする。
+画像だけでも送れる。代替テキストはファイル名で、`--image-alt` を指定すると全画像に同じ文言を使う。
+`invalid_blocks` の応答には1.5秒間隔で最大3回再試行する。
+
+`send --image` と `--at` / `--after` の併用はアップロード前にエラーになる。
+`--dry-run` は画像の検証と送信内容の表示だけを行い、アップロード・処理待ち・投稿を行わない。
+途中で失敗した場合、完了済みの非公開ファイルは残る。自動削除は行わない。
+
 ## 保存先
 
 | 対象 | パス |
