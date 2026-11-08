@@ -1,5 +1,19 @@
 # ファイルアップロード / ダウンロード 実装仕様（Rust 移植用）
 
+## Rust版の追加仕様
+
+以下のSDK解析は移植元の記録。現在のRust版は次の点を拡張している。
+
+- `upload --channel` は任意。省略時は `files.completeUploadExternal` の `channel_id` を省略し、どこにも共有しない。
+- `--thread` / `--message` / `--blocks` / `--blocks-file` は channel 必須。
+- blocks は JSON 配列として検証し、JSON文字列にして完了APIの `blocks` フィールドへ渡す。
+  `--blocks` と `--blocks-file`、blocks と `--message` はそれぞれ排他。
+- table / JSON の `files[].id` にファイルIDを出す。非公開時の `channel` は null。
+- `send --image` は同じ3段階の処理を channel なしで使う。その後の処理待ちと投稿は
+  [cmd-message.md](cmd-message.md) の「Rust版の画像添付」を参照。
+- dry-run は3段階の書き込みをすべて省略する。
+
+
 対象コード（すべて読み取り専用の参照元）:
 
 - `slack-cli/src/commands/upload.ts`

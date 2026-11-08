@@ -1,5 +1,11 @@
 # ファイル系コマンド仕様（upload / download / canvas / bookmark）
 
+Rust版の `upload` は `--channel` が任意。省略時は非公開アップロードとなる。
+`--thread` / `--message` / `--blocks` / `--blocks-file` は channel 必須で、blocks と message は排他。
+blocksのフォーム送信と出力は [common-upload.md](common-upload.md) の追加仕様に従う。
+以下はTypeScript版の移植元の記録であり、uploadのchannel必須という記述は現在のRust版には適用しない。
+
+
 Rust 移植用の仕様書。参照元は TypeScript 実装（`/Users/mimo/organizations/open-source/slack-cli`）の以下のファイル。
 
 - `src/index.ts`

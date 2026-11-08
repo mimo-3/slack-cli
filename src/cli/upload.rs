@@ -47,9 +47,9 @@ const FILE_KEYS: [&str; 6] = [
 
 #[derive(Args, Debug)]
 pub struct UploadCommand {
-    /// Channel name or ID
-    #[arg(short, long, required = true, value_name = "CHANNEL")]
-    pub channel: String,
+    /// Share to channel name or ID; omit for a private silent upload
+    #[arg(short, long, value_name = "CHANNEL")]
+    pub channel: Option<String>,
 
     /// File path to upload
     #[arg(short, long, value_name = "FILE")]
@@ -67,15 +67,23 @@ pub struct UploadCommand {
     #[arg(long, value_name = "TITLE")]
     pub title: Option<String>,
 
-    /// Initial comment with the file
+    /// Initial comment with the file (requires --channel; conflicts with blocks)
     #[arg(short, long, value_name = "MESSAGE")]
     pub message: Option<String>,
+
+    /// Block Kit JSON array accompanying the file (requires --channel)
+    #[arg(long, value_name = "JSON")]
+    pub blocks: Option<String>,
+
+    /// File containing Block Kit JSON array (requires --channel)
+    #[arg(long, value_name = "FILE")]
+    pub blocks_file: Option<String>,
 
     /// Snippet type (e.g. python, javascript, csv)
     #[arg(long, value_name = "FILETYPE")]
     pub filetype: Option<String>,
 
-    /// Thread timestamp to upload as reply
+    /// Thread timestamp to upload as reply (requires --channel)
     #[arg(short, long, value_name = "THREAD")]
     pub thread: Option<String>,
 }
@@ -85,18 +93,38 @@ pub async fn run(
     client: &SlackClient,
     global: &GlobalOpts,
 ) -> Result<(), SlackCliError> {
+    if cmd.channel.is_none()
+        && (cmd.thread.is_some()
+            || cmd.message.is_some()
+            || cmd.blocks.is_some()
+            || cmd.blocks_file.is_some())
+    {
+        return Err(SlackCliError::Validation(
+            "--thread, --message and --blocks/--blocks-file require --channel".into(),
+        ));
+    }
+    let blocks = super::send::load_blocks(cmd.blocks.as_deref(), cmd.blocks_file.as_deref())?;
+    if blocks.is_some() && cmd.message.is_some() {
+        return Err(SlackCliError::Validation(
+            "Cannot use --message with blocks".into(),
+        ));
+    }
     validate_thread_ts(cmd.thread.as_deref())?;
     let (data, filename) = load_payload(&cmd)?;
     let title = cmd.title.clone().unwrap_or_else(|| filename.clone());
 
-    let channel_id = resolve_channel_id(client, &cmd.channel).await?;
+    let channel_id = match &cmd.channel {
+        Some(channel) => Some(resolve_channel_id(client, channel).await?),
+        None => None,
+    };
 
     let files = if client.dry_run {
         // 実データ POST は本体クライアントのリトライ層を通らないので、
         // dry-run はここで打ち切って 3 段とも撃たない。
         eprintln!(
-            "[dry-run] would upload {} bytes as \"{filename}\" to {channel_id}",
-            data.len()
+            "[dry-run] would upload {} bytes as \"{filename}\" to {}",
+            data.len(),
+            channel_id.as_deref().unwrap_or("private storage")
         );
         Vec::new()
     } else {
@@ -115,9 +143,10 @@ pub async fn run(
             &CompleteUpload {
                 file_id: &file_id,
                 title: &title,
-                channel_id: &channel_id,
+                channel_id: channel_id.as_deref(),
                 thread_ts: cmd.thread.as_deref(),
                 initial_comment: cmd.message.as_deref(),
+                blocks: blocks.as_ref(),
             },
         )
         .await?;
@@ -129,7 +158,10 @@ pub async fn run(
         global,
         &format!(
             "✓ File uploaded successfully to {}",
-            display_channel(&cmd.channel)
+            cmd.channel
+                .as_deref()
+                .map(display_channel)
+                .unwrap_or_else(|| "private storage".into())
         ),
     )?;
 
@@ -279,9 +311,10 @@ fn is_trusted_upload_url(url: &url::Url, base_url: &url::Url) -> bool {
 struct CompleteUpload<'a> {
     file_id: &'a str,
     title: &'a str,
-    channel_id: &'a str,
+    channel_id: Option<&'a str>,
     thread_ts: Option<&'a str>,
     initial_comment: Option<&'a str>,
+    blocks: Option<&'a Value>,
 }
 
 /// 3 段目。`files` は JSON 文字列を urlencoded の 1 フィールドに載せる形。
@@ -291,8 +324,14 @@ async fn complete_upload(
 ) -> Result<Value, SlackCliError> {
     let files_json = serde_json::to_string(&json!([{ "id": opts.file_id, "title": opts.title }]))?;
 
-    let mut params: Vec<(&str, &str)> =
-        vec![("files", &files_json), ("channel_id", opts.channel_id)];
+    let blocks_json = opts.blocks.map(serde_json::to_string).transpose()?;
+    let mut params: Vec<(&str, &str)> = vec![("files", &files_json)];
+    if let Some(channel_id) = opts.channel_id {
+        params.push(("channel_id", channel_id));
+    }
+    if let Some(blocks) = blocks_json.as_deref() {
+        params.push(("blocks", blocks));
+    }
     if let Some(thread_ts) = opts.thread_ts {
         params.push(("thread_ts", thread_ts));
     }
@@ -301,6 +340,29 @@ async fn complete_upload(
     }
 
     client.post_form(COMPLETE_UPLOAD_METHOD, &params).await
+}
+
+/// Upload without sharing; the caller owns any subsequent message and cleanup.
+pub(crate) async fn upload_private(
+    client: &SlackClient,
+    data: Vec<u8>,
+    filename: &str,
+) -> Result<String, SlackCliError> {
+    let (url, id) = get_upload_url(client, filename, data.len() as u64, None).await?;
+    post_file_data(client, &url, data).await?;
+    complete_upload(
+        client,
+        &CompleteUpload {
+            file_id: &id,
+            title: filename,
+            channel_id: None,
+            thread_ts: None,
+            initial_comment: None,
+            blocks: None,
+        },
+    )
+    .await?;
+    Ok(id)
 }
 
 fn collect_files(response: &Value) -> Vec<Value> {
@@ -327,7 +389,6 @@ fn pick_file_fields(file: &Value) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use clap::error::ErrorKind;
     use clap::Parser;
     use url::Url;
     use wiremock::matchers::{method, path};
@@ -335,6 +396,82 @@ mod tests {
 
     use crate::cli::Cli;
     use crate::output::OutputFormat;
+
+    #[tokio::test]
+    async fn silent_upload_omits_sharing_fields_and_preserves_id() {
+        let server = MockServer::start().await;
+        mount_upload_flow(&server).await;
+        let mut cmd = command("unused");
+        cmd.channel = None;
+        cmd.content = Some("hello".into());
+        run(cmd, &client_for(&server), &json_opts()).await.unwrap();
+        let requests = server.received_requests().await.unwrap();
+        assert_eq!(requests.len(), 3);
+        let body = body_of(&requests, "files.completeUploadExternal");
+        assert!(!body.contains("channel_id"));
+        assert!(!body.contains("initial_comment"));
+        assert!(!body.contains("thread_ts"));
+        let files = collect_files(&json!({"files": [{"id": "F0123456789"}]}));
+        for format in [OutputFormat::Table, OutputFormat::Json] {
+            let mut output = Vec::new();
+            output::format_value(
+                &json!({"channel": null, "files": files}),
+                format,
+                &mut output,
+            )
+            .unwrap();
+            assert!(String::from_utf8(output).unwrap().contains("F0123456789"));
+        }
+    }
+
+    #[tokio::test]
+    async fn blocks_are_encoded_in_completion() {
+        let server = MockServer::start().await;
+        mount_upload_flow(&server).await;
+        let mut cmd = command("C0123456789");
+        cmd.content = Some("hello".into());
+        cmd.blocks = Some(r#"[{"type":"section","text":{"type":"mrkdwn","text":"hello"}}]"#.into());
+        let dir = tempfile::tempdir().unwrap();
+        let blocks_file = dir.path().join("blocks.json");
+        std::fs::write(&blocks_file, cmd.blocks.take().unwrap()).unwrap();
+        cmd.blocks_file = Some(blocks_file.to_string_lossy().into_owned());
+        run(cmd, &client_for(&server), &json_opts()).await.unwrap();
+        let requests = server.received_requests().await.unwrap();
+        let body = body_of(&requests, "files.completeUploadExternal");
+        let blocks: Value = serde_json::from_str(&form_urlencoded_value(body, "blocks")).unwrap();
+        assert_eq!(blocks[0]["text"]["text"], "hello");
+        assert!(!body.contains("initial_comment"));
+    }
+
+    #[tokio::test]
+    async fn invalid_upload_options_do_not_make_requests() {
+        let server = MockServer::start().await;
+        for flag in ["--thread", "--message", "--blocks", "--blocks-file"] {
+            let mut cmd = command("unused");
+            cmd.channel = None;
+            cmd.content = Some("hello".into());
+            match flag {
+                "--thread" => cmd.thread = Some("1700000000.000100".into()),
+                "--message" => cmd.message = Some("hello".into()),
+                "--blocks" => cmd.blocks = Some("[]".into()),
+                _ => cmd.blocks_file = Some("/nonexistent/blocks.json".into()),
+            }
+            assert!(run(cmd, &client_for(&server), &json_opts()).await.is_err());
+        }
+        for (blocks, blocks_file, message) in [
+            (Some("[]"), None, Some("hi")),
+            (Some("[]"), Some("b.json"), None),
+            (Some("{}"), None, None),
+        ] {
+            let mut cmd = command("C0123456789");
+            cmd.content = Some("hello".into());
+            cmd.blocks = blocks.map(str::to_string);
+            cmd.blocks_file = blocks_file.map(str::to_string);
+            cmd.message = message.map(str::to_string);
+            assert!(run(cmd, &client_for(&server), &json_opts()).await.is_err());
+        }
+        assert!(server.received_requests().await.unwrap().is_empty());
+    }
 
     fn client_for(server: &MockServer) -> SlackClient {
         SlackClient::new("test-token-value")
@@ -344,12 +481,14 @@ mod tests {
 
     fn command(channel: &str) -> UploadCommand {
         UploadCommand {
-            channel: channel.to_string(),
+            channel: Some(channel.to_string()),
             file: None,
             content: None,
             filename: None,
             title: None,
             message: None,
+            blocks: None,
+            blocks_file: None,
             filetype: None,
             thread: None,
         }
@@ -438,11 +577,8 @@ mod tests {
     }
 
     #[test]
-    fn channel_is_the_only_required_flag() {
-        Cli::try_parse_from(["slack-cli", "upload", "-c", "general"]).unwrap();
-        let err = Cli::try_parse_from(["slack-cli", "upload", "-f", "notes.md"])
-            .expect_err("--channel is required");
-        assert_eq!(err.kind(), ErrorKind::MissingRequiredArgument);
+    fn channel_is_optional() {
+        Cli::try_parse_from(["slack-cli", "upload", "-f", "notes.md"]).unwrap();
     }
 
     #[test]
@@ -780,9 +916,10 @@ mod tests {
             &CompleteUpload {
                 file_id: &file_id,
                 title: "report.csv",
-                channel_id: "C0123456789",
+                channel_id: Some("C0123456789"),
                 thread_ts: None,
                 initial_comment: None,
+                blocks: None,
             },
         )
         .await

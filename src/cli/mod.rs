@@ -138,7 +138,7 @@ pub enum Command {
     Reaction(reaction::ReactionCommand),
     /// Add, remove, or list pinned messages in a channel
     Pin(pin::PinCommand),
-    /// Upload a file or snippet to a Slack channel
+    /// Upload a file or snippet privately or share it to a Slack channel
     Upload(upload::UploadCommand),
     /// Download a file from Slack
     Download(download::DownloadCommand),
